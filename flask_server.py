@@ -60,12 +60,15 @@ def index():
         drawings=load_drawings()
     )
 
-@app.route("/save_drawings", methods=["POST"])
+@app.route('/save_drawings', methods=['POST'])
 def save_drawings():
+    import json, os
     data = request.get_json()
-    with open(DRAWINGS_FILE, "w") as f:
+    path = os.path.join('static', 'drawings.json')
+    with open(path,'w') as f:
         json.dump(data, f)
-    return "ok"
+    return jsonify(success=True)
+
 
 # Example pathfinding endpoint
 @app.route("/compute_path")
