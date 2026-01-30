@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaflet Map with Persistent Drawings</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+</head>
+<body>
+<h2>Tile Map with Persistent Drawings</h2>
+
+<div>
+    Start (lat,lon): <input id="start" placeholder="e.g. 35.189427,33.050308">
+    Goal (lat,lon): <input id="goal" placeholder="e.g. 35.216094,33.012543">
+    <button onclick="plotPath()">Show Path</button>
+</div>
+
+<div id="map" style="width:100%; height:80vh;"></div>
+
+<script>
+    // Map setup
+    var bounds = [[{{ bounds.south }}, {{ bounds.west }}], [{{ bounds.north }}, {{ bounds.east }}]];
+    var map = L.map('map').fitBounds(bounds);
+
+    L.tileLayer('/static/tiles/{z}/{x}/{y}.png', {
+        minZoom: {{ min_zoom }},
+        maxZoom: {{ max_zoom }},
+        noWrap: true,
+        bounds: bounds
+    }).addTo(map);
+
+    var drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    var drawControl = new L.Control.Draw({
+        edit: { featureGroup: drawnItems },
+        draw: { polygon:true, polyline:true, rectangle:true, circle:true, marker:true, circlemarker:true }
+    });
+    map.addControl(drawControl);
+
+    // Persistent drawings
+    var drawings = {{ drawings | safe }};
+
+    function layerFromFeature(f){
+        var layer = null;
+        if(f.type === "Feature"){
+            var geom = f.geometry;
+            if(geom.type === "Polygon"){
+                layer = L.polygon(geom.coordinates[0].map(c=>[c[1],c[0]]));
+            } else if(geom.type === "Point"){
+                if(f.properties && f.properties.radius){
+                    layer = L.circle([geom.coordinates[1], geom.coordinates[0]], {radius:f.properties.radius});
+                } else if(f.properties && f.properties.type === "circlemarker"){
+                    layer = L.circleMarker([geom.coordinates[1], geom.coordinates[0]], {radius: f.properties.radius || 5});
+                } else {
+                    layer = L.marker([geom.coordinates[1], geom.coordinates[0]]);
+                }
+            } else if(geom.type === "LineString"){
+                layer = L.polyline(geom.coordinates.map(c=>[c[1],c[0]]));
+            }
+        }
+        return layer;
+    }
+
+    drawings.forEach(f => {
+        var layer = layerFromFeature(f);
+        if(layer) drawnItems.addLayer(layer);
+    });
+
+    function layerToFeature(layer){
+        var feature = {type:"Feature", properties:{}, geometry:{}};
+        if(layer instanceof L.Marker){
+            feature.geometry = {type:"Point", coordinates:[layer.getLatLng().lng, layer.getLatLng().lat]};
+        } else if(layer instanceof L.Circle){
+            feature.geometry = {type:"Point", coordinates:[layer.getLatLng().lng, layer.getLatLng().lat]};
+            feature.properties.radius = layer.getRadius();
+        } else if(layer instanceof L.CircleMarker){
+            feature.geometry = {type:"Point", coordinates:[layer.getLatLng().lng, layer.getLatLng().lat]};
+            feature.properties.type = "circlemarker";
+            feature.properties.radius = layer.getRadius();
+        } else if(layer instanceof L.Polygon && !(layer instanceof L.Circle)){
+            feature.geometry = {type:"Polygon", coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])] };
+        } else if(layer instanceof L.Polyline){
+            feature.geometry = {type:"LineString", coordinates:layer.getLatLngs().map(c=>[c.lng,c.lat])};
+        }
+        return feature;
+    }
+
+    function saveDrawings(){
+        fetch('/save_drawings', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(drawings)
+        });
+    }
+
+    map.on(L.Draw.Event.CREATED, function(e){
+        drawnItems.addLayer(e.layer);
+        drawings.push(layerToFeature(e.layer));
+        saveDrawings();
+    });
+
+    map.on(L.Draw.Event.EDITED, function(e){
+        e.layers.eachLayer(function(layer){
+            var idx = drawnItems.getLayers().indexOf(layer);
+            if(idx >= 0) drawings[idx] = layerToFeature(layer);
+        });
+        saveDrawings();
+    });
+
+    map.on(L.Draw.Event.DELETED, function(e){
+        e.layers.eachLayer(function(layer){
+            var idx = drawnItems.getLayers().indexOf(layer);
+            if(idx >= 0) drawings.splice(idx,1);
+        });
+        saveDrawings();
+    });
+
+    // Pathfinding
+    var pathLayer;
+    function plotPath(){
+        var startInput = document.getElementById("start").value.split(",");
+        var goalInput = document.getElementById("goal").value.split(",");
+
+        if(startInput.length!==2 || goalInput.length!==2){ alert("Use lat,lon format"); return; }
+
+        var sLat = parseFloat(startInput[0].trim());
+        var sLon = parseFloat(startInput[1].trim());
+        var gLat = parseFloat(goalInput[0].trim());
+        var gLon = parseFloat(goalInput[1].trim());
+
+        fetch(`/compute_path?start_lat=${sLat}&start_lon=${sLon}&goal_lat=${gLat}&goal_lon=${gLon}`)
+        .then(r => r.json())
+        .then(path => {
+            if(path.error){ alert(path.error); return; }
+
+            if(pathLayer) drawnItems.removeLayer(pathLayer);
+
+            pathLayer = L.polyline(path.map(p=>[p[0],p[1]]), {color:'red', weight:3});
+            drawnItems.addLayer(pathLayer);
+            map.fitBounds(pathLayer.getBounds());
+
+            saveDrawings();
+        });
+    }
+
+</script>
+</body>
+</html>

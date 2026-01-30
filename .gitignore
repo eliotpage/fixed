@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+venv/
+.venv/
+
+# Flask / environment
+.env
+instance/
+
+# Tile cache (VERY IMPORTANT)
+static/tiles/
+tiles/
+static/tiles.zip
+*.mbtiles
+
+# App cache / temp
+config/cache/
+cache/
+tmp/
+
+# Drawings backups (optional)
+*.bak
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
