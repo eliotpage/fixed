@@ -1,92 +1,81 @@
-from flask import Flask, render_template, send_from_directory, request, jsonify
-import os
-import json
-import math
+from flask import Flask, render_template, request, jsonify
+import os, json, math
 
 app = Flask(__name__)
 
-# Path to tiles and drawings
-TILES_DIR = "static/tiles"
-DRAWINGS_FILE = "static/drawings.json"
+DRAWINGS_FILE = os.path.join('static', 'drawings.json')
+TILE_DIR = os.path.join('static', 'tiles')
 
-MIN_ZOOM = 10
-MAX_ZOOM = 16
-
-def load_drawings():
-    if os.path.exists(DRAWINGS_FILE):
-        with open(DRAWINGS_FILE) as f:
-            return json.load(f)
-    return []
-
-def tile_to_lon(x, z):
-    return x / (2**z) * 360.0 - 180.0
-
-def tile_to_lat(y, z):
-    n = math.pi - 2.0 * math.pi * y / (2**z)
-    return math.degrees(math.atan(math.sinh(n)))
-
-def compute_bounds_all_zoom():
-    min_lat, max_lat = 90, -90
-    min_lon, max_lon = 180, -180
-
-    for z_name in os.listdir(TILES_DIR):
-        z_dir = os.path.join(TILES_DIR, z_name)
-        if not os.path.isdir(z_dir): continue
-        z = int(z_name)
-        for x_name in os.listdir(z_dir):
-            x_dir = os.path.join(z_dir, x_name)
-            if not os.path.isdir(x_dir): continue
-            x_tile = int(x_name)
-            for y_file in os.listdir(x_dir):
-                if not y_file.endswith(".png"): continue
-                y_tile = int(y_file.split(".")[0])
-                lon = tile_to_lon(x_tile, z)
-                lat = tile_to_lat(y_tile, z)
-                min_lat = min(min_lat, lat)
-                max_lat = max(max_lat, lat)
-                min_lon = min(min_lon, lon)
-                max_lon = max(max_lon, lon)
-
-    return {"north": max_lat, "south": min_lat, "west": min_lon, "east": max_lon}
-
-@app.route("/")
+# Serve main page
+@app.route('/')
 def index():
-    bounds = compute_bounds_all_zoom()
-    return render_template(
-        "index.html",
-        bounds=bounds,
-        min_zoom=MIN_ZOOM,
-        max_zoom=MAX_ZOOM,
-        drawings=load_drawings()
-    )
+    return render_template('index.html')
 
+# Serve login page
+@app.route('/login')
+def login():
+    return render_template('login.html')
+
+# Save drawings
 @app.route('/save_drawings', methods=['POST'])
 def save_drawings():
-    import json, os
     data = request.get_json()
-    path = os.path.join('static', 'drawings.json')
-    with open(path,'w') as f:
+    os.makedirs(os.path.dirname(DRAWINGS_FILE), exist_ok=True)
+    with open(DRAWINGS_FILE, 'w') as f:
         json.dump(data, f)
     return jsonify(success=True)
 
-
-# Example pathfinding endpoint
-@app.route("/compute_path")
+# Dummy pathfinding
+@app.route('/compute_path')
 def compute_path():
     try:
-        start_lat = float(request.args["start_lat"])
-        start_lon = float(request.args["start_lon"])
-        goal_lat = float(request.args["goal_lat"])
-        goal_lon = float(request.args["goal_lon"])
-    except:
-        return jsonify({"error": "Invalid coordinates"}), 400
+        start_lat = float(request.args.get('start_lat'))
+        start_lon = float(request.args.get('start_lon'))
+        goal_lat = float(request.args.get('goal_lat'))
+        goal_lon = float(request.args.get('goal_lon'))
+        path = [[start_lat, start_lon], [goal_lat, goal_lon]]
+        return jsonify(path)
+    except Exception as e:
+        return jsonify(error=str(e))
 
-    # Replace this with your real pathfinding logic
-    path = [
-        [start_lat, start_lon],
-        [goal_lat, goal_lon]
-    ]
-    return jsonify(path)
+# Detect existing zoom 10 tiles and compute bounds
+@app.route('/tile_bounds')
+def tile_bounds():
+    zoom = 10
+    zoom_dir = os.path.join(TILE_DIR, str(zoom))
+    if not os.path.exists(zoom_dir):
+        return jsonify(error=f"Zoom {zoom} folder missing"), 404
+
+    x_tiles = [int(d) for d in os.listdir(zoom_dir) if d.isdigit()]
+    min_x, max_x = min(x_tiles), max(x_tiles)
+
+    y_tiles_all = []
+    for x in x_tiles:
+        y_dir = os.path.join(zoom_dir, str(x))
+        if os.path.exists(y_dir):
+            y_tiles = [int(f.split('.')[0]) for f in os.listdir(y_dir) if f.endswith('.png')]
+            y_tiles_all.extend(y_tiles)
+    min_y, max_y = min(y_tiles_all), max(y_tiles_all)
+
+    def tile2lon(x, z): return x / (2**z) * 360 - 180
+    def tile2lat(y, z):
+        n = math.pi - 2 * math.pi * y / (2**z)
+        return math.degrees(math.atan(math.sinh(n)))
+
+    west = tile2lon(min_x, zoom)
+    east = tile2lon(max_x+1, zoom)
+    north = tile2lat(min_y, zoom)
+    south = tile2lat(max_y+1, zoom)
+    center_lat = (north + south)/2
+    center_lon = (west + east)/2
+
+    return jsonify({
+        'bounds': [[south, west], [north, east]],
+        'center': [center_lat, center_lon],
+        'minZoom': 9,
+        'maxZoom': 14
+    })
+
 
 if __name__ == "__main__":
     app.run(debug=True)

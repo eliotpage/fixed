@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>POPMAP Login</title>
+<style>
+body {
+    font-family: "Segoe UI", sans-serif;
+    background: #f4f4f4;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+#login-container {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    width: 360px;
+    text-align: center;
+}
+#tabs {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+}
+.tab {
+    flex: 1;
+    padding: 10px 0;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+.tab.active {
+    border-bottom: 2px solid #2980b9;
+    font-weight: bold;
+}
+/* Make ALL inputs look the same */
+#login-container input {
+    width: 100%;
+    height: 44px;
+
+    font-size: 16px;        /* SAME font size */
+    font-family: "Segoe UI", sans-serif;
+
+    padding: 0 12px;
+
+    border: 1px solid #ccc;
+    border-radius: 6px;
+
+    box-sizing: border-box;
+    margin: 8px 0;
+}
+.input-with-button {
+    position: relative;
+    width: 100%;
+    margin: 10px 0;
+}
+
+/* Main input */
+.input-with-button input {
+    width: 100%;
+    height: 44px;
+
+    padding: 0 80px 0 12px; /* space for button */
+    font-size: 16px;
+
+    border: 1px solid #ccc;
+    border-radius: 6px;
+
+    box-sizing: border-box;
+}
+
+/* Button INSIDE input */
+.input-with-button button {
+    position: absolute;
+
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    height: 32px;
+    min-width: 60px;
+
+    border: none;
+    border-radius: 4px;
+
+    background: #2980b9;
+    color: white;
+
+    font-size: 14px;
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+.input-with-button button:hover {
+    background: #3498db;
+}
+#login-container button.login-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    border: none;
+    background: #2980b9;
+    color: white;
+    cursor: pointer;
+}
+#login-container button.login-btn:hover {
+    background: #3498db;
+}
+</style>
+</head>
+<body>
+
+<div id="login-container">
+    <h2>POPMAP Login</h2>
+    <div id="tabs">
+        <div class="tab active" id="tab-email" onclick="switchTab('email')">Email</div>
+        <div class="tab" id="tab-phone" onclick="switchTab('phone')">Phone</div>
+    </div>
+
+    <!-- Callsign -->
+    <input type="text" id="callsign" placeholder="Callsign">
+
+    <!-- Email/Phone with OTP button inside -->
+    <div class="input-with-button">
+        <input type="text" id="contact" placeholder="Email or Phone">
+        <button type="button">Send</button>
+    </div>
+
+    <!-- OTP input -->
+    <input type="text" id="otp" placeholder="Enter OTP">
+
+    <!-- Login button -->
+    <button class="login-btn" type="button" onclick="verifyOTP()">Login</button>
+</div>
+
+<script>
+let loginMethod = 'email';
+
+function switchTab(method){
+    loginMethod = method;
+    document.getElementById('tab-email').classList.remove('active');
+    document.getElementById('tab-phone').classList.remove('active');
+    document.getElementById('tab-' + method).classList.add('active');
+
+    const contactInput = document.getElementById('contact');
+    contactInput.placeholder = method === 'email' ? 'Email' : 'Phone';
+}
+
+// Request OTP from server
+async function requestOTP(){
+    const callsign = document.getElementById('callsign').value.trim();
+    const contact = document.getElementById('contact').value.trim();
+    if(!callsign || !contact){ alert("Enter callsign and contact"); return; }
+
+    const res = await fetch('/request_otp', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user: contact})
+    });
+    const data = await res.json();
+    if(data.success){
+        alert("OTP sent! (Dev only: " + data.otp + ")");
+    } else {
+        alert(data.error);
+    }
+}
+
+// Verify OTP
+async function verifyOTP(){
+    const callsign = document.getElementById('callsign').value.trim();
+    const contact = document.getElementById('contact').value.trim();
+    const otp = document.getElementById('otp').value.trim();
+    if(!callsign || !contact || !otp){ alert("Fill all fields"); return; }
+
+    const res = await fetch('/login_verify', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user: contact, otp: otp})
+    });
+    const data = await res.json();
+    if(data.success){
+        alert("Login successful!");
+        window.location.href = '/map';
+    } else {
+        alert(data.error);
+    }
+}
+</script>
+
+</body>
+</html>
