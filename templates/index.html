@@ -70,143 +70,401 @@ html,body{height:100%;margin:0;font-family:"Segoe UI",sans-serif;background:#f4f
 <div id="map"></div>
 
 <script>
+
 var drawnItems = new L.FeatureGroup();
 var pathLayer;
-var startMarker, goalMarker;
+var startMarker = null;
+var goalMarker = null;
 var drawings = [];
 
-fetch('/tile_bounds').then(r=>r.json()).then(data=>{
-    if(data.error){ alert(data.error); return; }
+// ================= LOAD MAP =================
+
+fetch('/tile_bounds')
+.then(r => r.json())
+.then(data => {
+
+    if (data.error) {
+        alert(data.error);
+        return;
+    }
 
     var bounds = data.bounds;
     var center = data.center;
     var minZoom = data.minZoom;
     var maxZoom = data.maxZoom;
 
-    var map = L.map('map',{center:center,zoom:11,minZoom:minZoom,maxZoom:maxZoom});
+    // Create map
+    var map = L.map('map', {
+        center: center,
+        zoom: 11,
+        minZoom: minZoom,
+        maxZoom: maxZoom
+    });
 
-    // Tiles
-    L.tileLayer('static/tiles/{z}/{x}/{y}.png',{minZoom:minZoom,maxZoom:10,noWrap:true}).addTo(map);
-    L.tileLayer('static/tiles/{z}/{x}/{y}.png',{minZoom:11,maxZoom:maxZoom,noWrap:true}).addTo(map);
+    // Tile layers
+    L.tileLayer('static/tiles/{z}/{x}/{y}.png', {
+        minZoom: minZoom,
+        maxZoom: 10,
+        noWrap: true
+    }).addTo(map);
 
-    // Restrict panning to tiles at zoom 11+
-    function updateBounds(){
-        if(map.getZoom() >= 11){ map.setMaxBounds(bounds); map.options.maxBoundsViscosity=1.0; }
-        else{ map.setMaxBounds(null); }
+    L.tileLayer('static/tiles/{z}/{x}/{y}.png', {
+        minZoom: 11,
+        maxZoom: maxZoom,
+        noWrap: true
+    }).addTo(map);
+
+
+    // Restrict panning at zoom >= 11
+    function updateBounds() {
+        if (map.getZoom() >= 11) {
+            map.setMaxBounds(bounds);
+            map.options.maxBoundsViscosity = 1.0;
+        } else {
+            map.setMaxBounds(null);
+        }
     }
+
     updateBounds();
     map.on('zoomend', updateBounds);
 
-    // Draw controls
+
+    // ================= DRAW TOOLS =================
+
     map.addLayer(drawnItems);
+
     var drawControl = new L.Control.Draw({
-        edit: {featureGroup: drawnItems},
-        draw: {polygon:true, polyline:true, rectangle:true, circle:true, circlemarker:true, marker:true}
+        edit: {
+            featureGroup: drawnItems
+        },
+        draw: {
+            polygon: true,
+            polyline: true,
+            rectangle: true,
+            circle: true,
+            circlemarker: true,
+            marker: true
+        }
     });
+
     map.addControl(drawControl);
 
-    // Load persisted drawings
-    fetch('/static/drawings.json').then(r=>r.json()).then(data=>{
+
+    // ================= LOAD DRAWINGS =================
+
+    fetch('/static/drawings.json')
+    .then(r => r.json())
+    .then(data => {
+
         drawings = data || [];
+
         drawings.forEach(f => {
-            let l = featureToLayer(f);
-            if(l) {
-                drawnItems.addLayer(l);
-                bindPopupToLayer(l);
+
+            // Skip deleted
+            if (f.properties && f.properties.deleted) return;
+
+            let layer = featureToLayer(f);
+
+            if (layer) {
+                drawnItems.addLayer(layer);
+                bindPopupToLayer(layer);
             }
         });
+
     });
 
+
+    // ================= DRAW EVENTS =================
+
+    // Created
     map.on(L.Draw.Event.CREATED, e => {
+
         drawnItems.addLayer(e.layer);
-        drawings.push(layerToFeature(e.layer));
+
+        let feature = layerToFeature(e.layer);
+
+        // Ensure not deleted
+        feature.properties.deleted = false;
+
+        drawings.push(feature);
+
         bindPopupToLayer(e.layer);
-        saveDrawings();
-    });
-    map.on(L.Draw.Event.EDITED, e => {
-        e.layers.eachLayer(layer => {
-            let idx = drawings.findIndex(f => f.properties._id === layer._leaflet_id);
-            if(idx>=0) drawings[idx] = layerToFeature(layer);
-        });
-        saveDrawings();
-    });
-    map.on(L.Draw.Event.DELETED, e => {
-        e.layers.eachLayer(layer => { drawings = drawings.filter(f => f.properties._id !== layer._leaflet_id); });
+
         saveDrawings();
     });
 
-    // Pathfinding using DStar on server
-    window.plotPath = function(){
+
+    // Edited
+    map.on(L.Draw.Event.EDITED, e => {
+
+        e.layers.eachLayer(layer => {
+
+            let idx = drawings.findIndex(
+                f => f.properties._id === layer._leaflet_id
+            );
+
+            if (idx >= 0) {
+                drawings[idx] = layerToFeature(layer);
+                drawings[idx].properties.deleted = false;
+            }
+
+        });
+
+        saveDrawings();
+    });
+
+
+    // Deleted (soft delete)
+    map.on(L.Draw.Event.DELETED, e => {
+
+        e.layers.eachLayer(layer => {
+
+            let feature = drawings.find(
+                f => f.properties._id === layer._leaflet_id
+            );
+
+            if (feature) {
+                feature.properties.deleted = true;
+            }
+
+        });
+
+        saveDrawings();
+    });
+
+
+    // ================= PATHFINDING =================
+
+    window.plotPath = function () {
+
         let s = document.getElementById('start').value.split(',');
         let g = document.getElementById('goal').value.split(',');
-        if(s.length!==2 || g.length!==2){alert("Invalid input"); return;}
-        let start_lat = parseFloat(s[0]), start_lon = parseFloat(s[1]);
-        let goal_lat = parseFloat(g[0]), goal_lon = parseFloat(g[1]);
-        if(isNaN(start_lat)||isNaN(start_lon)||isNaN(goal_lat)||isNaN(goal_lon)){alert("Coords must be numbers"); return;}
+
+        if (s.length !== 2 || g.length !== 2) {
+            alert("Invalid input");
+            return;
+        }
+
+        let start_lat = parseFloat(s[0]);
+        let start_lon = parseFloat(s[1]);
+        let goal_lat = parseFloat(g[0]);
+        let goal_lon = parseFloat(g[1]);
+
+        if (
+            isNaN(start_lat) ||
+            isNaN(start_lon) ||
+            isNaN(goal_lat) ||
+            isNaN(goal_lon)
+        ) {
+            alert("Coords must be numbers");
+            return;
+        }
 
         fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}`)
         .then(res => res.json())
         .then(path => {
-            if(path.error){ alert(path.error); return; }
 
-            // Remove old path and markers
-            if(pathLayer) drawnItems.removeLayer(pathLayer);
-            if(startMarker) drawnItems.removeLayer(startMarker);
-            if(goalMarker) drawnItems.removeLayer(goalMarker);
+            if (path.error) {
+                alert(path.error);
+                return;
+            }
 
-            // Draw new path
-            pathLayer = L.polyline(path.map(p => [p[0], p[1]]), {color:'red', weight:3}).addTo(drawnItems);
+            // Remove old path + markers
+            if (pathLayer) drawnItems.removeLayer(pathLayer);
+            if (startMarker) drawnItems.removeLayer(startMarker);
+            if (goalMarker) drawnItems.removeLayer(goalMarker);
 
-            // Draw start and goal markers with coordinate popups
-            startMarker = L.marker([path[0][0], path[0][1]]).addTo(drawnItems)
-                .bindPopup(`${path[0][0].toFixed(6)}, ${path[0][1].toFixed(6)}`);
-            goalMarker = L.marker([path[path.length-1][0], path[path.length-1][1]]).addTo(drawnItems)
-                .bindPopup(`${path[path.length-1][0].toFixed(6)}, ${path[path.length-1][1].toFixed(6)}`);
+
+            // Draw path
+            pathLayer = L.polyline(
+                path.map(p => [p[0], p[1]]),
+                { color: 'red', weight: 3 }
+            ).addTo(drawnItems);
+
+
+            // Start marker
+            startMarker = L.marker([path[0][0], path[0][1]])
+                .addTo(drawnItems)
+                .bindPopup(formatCoords(path[0][0], path[0][1]));
+
+
+            // Goal marker
+            let last = path[path.length - 1];
+
+            goalMarker = L.marker([last[0], last[1]])
+                .addTo(drawnItems)
+                .bindPopup(formatCoords(last[0], last[1]));
+
 
             map.fitBounds(pathLayer.getBounds());
+
         });
-    }
+    };
+
 });
 
-// Helpers for drawings
-function featureToLayer(f){
-    var layer=null;
-    if(f.type==="Feature"){
-        var g=f.geometry;
-        if(g.type==="Polygon") layer=L.polygon(g.coordinates[0].map(c=>[c[1],c[0]]));
-        else if(g.type==="LineString") layer=L.polyline(g.coordinates.map(c=>[c[1],c[0]]));
-        else if(g.type==="Point"){
-            if(f.properties && f.properties.radius) layer=L.circle([g.coordinates[1],g.coordinates[0]], {radius:f.properties.radius});
-            else if(f.properties && f.properties.isCircleMarker) layer=L.circleMarker([g.coordinates[1],g.coordinates[0]]);
-            else layer=L.marker([g.coordinates[1],g.coordinates[0]]);
+
+// ================= HELPERS =================
+
+
+// Convert saved feature → leaflet layer
+function featureToLayer(f) {
+
+    var layer = null;
+
+    if (f.type === "Feature") {
+
+        var g = f.geometry;
+
+        if (g.type === "Polygon") {
+            layer = L.polygon(
+                g.coordinates[0].map(c => [c[1], c[0]])
+            );
+        }
+
+        else if (g.type === "LineString") {
+            layer = L.polyline(
+                g.coordinates.map(c => [c[1], c[0]])
+            );
+        }
+
+        else if (g.type === "Point") {
+
+            if (f.properties && f.properties.radius) {
+                layer = L.circle(
+                    [g.coordinates[1], g.coordinates[0]],
+                    { radius: f.properties.radius }
+                );
+            }
+
+            else if (f.properties && f.properties.isCircleMarker) {
+                layer = L.circleMarker(
+                    [g.coordinates[1], g.coordinates[0]]
+                );
+            }
+
+            else {
+                layer = L.marker(
+                    [g.coordinates[1], g.coordinates[0]]
+                );
+            }
         }
     }
-    if(layer) {
+
+    if (layer) {
         layer._leaflet_id = f.properties._id || layer._leaflet_id;
-        bindPopupToLayer(layer);
     }
+
     return layer;
 }
 
-function layerToFeature(layer){
-    var feature = {type:"Feature", properties:{_id:layer._leaflet_id}, geometry:{}};
-    if(layer instanceof L.Marker) feature.geometry = {type:"Point", coordinates:[layer.getLatLng().lng, layer.getLatLng().lat]};
-    else if(layer instanceof L.Circle){ feature.geometry={type:"Point",coordinates:[layer.getLatLng().lng,layer.getLatLng().lat]}; feature.properties.radius = layer.getRadius(); }
-    else if(layer instanceof L.CircleMarker){ feature.geometry={type:"Point",coordinates:[layer.getLatLng().lng,layer.getLatLng().lat]}; feature.properties.isCircleMarker=true; }
-    else if(layer instanceof L.Polygon && !(layer instanceof L.Circle)) feature.geometry={type:"Polygon", coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])]}; 
-    else if(layer instanceof L.Polyline) feature.geometry={type:"LineString", coordinates:layer.getLatLngs().map(c=>[c.lng,c.lat])};
+
+// Convert leaflet layer → feature
+function layerToFeature(layer) {
+
+    var feature = {
+        type: "Feature",
+        properties: {
+            _id: layer._leaflet_id,
+            deleted: false
+        },
+        geometry: {}
+    };
+
+    if (layer instanceof L.Marker) {
+
+        feature.geometry = {
+            type: "Point",
+            coordinates: [
+                layer.getLatLng().lng,
+                layer.getLatLng().lat
+            ]
+        };
+    }
+
+    else if (layer instanceof L.Circle) {
+
+        feature.geometry = {
+            type: "Point",
+            coordinates: [
+                layer.getLatLng().lng,
+                layer.getLatLng().lat
+            ]
+        };
+
+        feature.properties.radius = layer.getRadius();
+    }
+
+    else if (layer instanceof L.CircleMarker) {
+
+        feature.geometry = {
+            type: "Point",
+            coordinates: [
+                layer.getLatLng().lng,
+                layer.getLatLng().lat
+            ]
+        };
+
+        feature.properties.isCircleMarker = true;
+    }
+
+    else if (layer instanceof L.Polygon && !(layer instanceof L.Circle)) {
+
+        feature.geometry = {
+            type: "Polygon",
+            coordinates: [
+                layer.getLatLngs()[0].map(c => [c.lng, c.lat])
+            ]
+        };
+    }
+
+    else if (layer instanceof L.Polyline) {
+
+        feature.geometry = {
+            type: "LineString",
+            coordinates: layer.getLatLngs().map(c => [c.lng, c.lat])
+        };
+    }
+
     return feature;
 }
 
-// Bind a popup showing coordinates to any marker or circle
-function bindPopupToLayer(layer){
-    if(layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.CircleMarker){
-        var latlng = layer.getLatLng();
-        layer.bindPopup(`${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
+
+// Show coords on click
+function bindPopupToLayer(layer) {
+
+    if (
+        layer instanceof L.Marker ||
+        layer instanceof L.Circle ||
+        layer instanceof L.CircleMarker
+    ) {
+
+        let ll = layer.getLatLng();
+
+        layer.bindPopup(
+            formatCoords(ll.lat, ll.lng)
+        );
     }
 }
 
-function saveDrawings(){ fetch('/save_drawings',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(drawings)}); }
+
+// Format coordinate popup
+function formatCoords(lat, lon) {
+
+    return `Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`;
+}
+
+
+// Save to server
+function saveDrawings() {
+
+    fetch('/save_drawings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(drawings)
+    });
+}
+
 </script>
 
 </body>

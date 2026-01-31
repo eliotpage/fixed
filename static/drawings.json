@@ -1,1 +1,1 @@
-[]
+[{"type": "Feature", "properties": {"_id": 176, "deleted": true}, "geometry": {"type": "Polygon", "coordinates": [[[32.875900268554695, 35.08760777840522], [32.875900268554695, 35.13254452689976], [33.00430297851563, 35.13254452689976], [33.00430297851563, 35.08760777840522]]]}}, {"type": "Feature", "properties": {"_id": 190, "deleted": true}, "geometry": {"type": "Point", "coordinates": [32.91297912597657, 34.9903473720499]}}]
