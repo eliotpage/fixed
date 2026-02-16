@@ -6,7 +6,10 @@ jobs:
   run-flask:
     runs-on: ubuntu-latest
     env:
-      MY_SECRET: ${{ secrets.MY_SECRET }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+
     steps:
       - uses: actions/checkout@v3
 
