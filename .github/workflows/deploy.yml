@@ -1,27 +1,22 @@
 name: Run Flask
 
-on:
-  push:
-    branches:
-      - main
+on: push
 
 jobs:
   run-flask:
     runs-on: ubuntu-latest
     env:
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      MY_SECRET: ${{ secrets.MY_SECRET }}
     steps:
       - uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.12
+          python-version: '3.11'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Flask
-        run: python flask_server.py
+      - name: Run Flask script
+        run: python app.py
