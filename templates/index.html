@@ -9,155 +9,28 @@
 
 <style>
 html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; background:#f4f4f4; }
-
-/* SITE ALERT */
-#site-alert {
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #f44336;
-    color:white;
-    padding:10px 20px;
-    border-radius:4px;
-    display:none;
-    z-index:9999;
-    box-shadow:0 2px 8px rgba(0,0,0,0.2);
-}
-
-/* HEADER */
-#header-container {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:10px 20px;
-    background:#2c3e50;
-    color:white;
-}
-
-#header-buttons button {
-    padding:6px 12px;
-    border:none;
-    border-radius:4px;
-    background:#2980b9;
-    color:white;
-    cursor:pointer;
-}
-
-#header-buttons button:hover {
-    background:#3498db;
-}
-
-/* CONTROLS */
-#controls {
-    display:flex;
-    justify-content:center;
-    gap:10px;
-    flex-wrap:wrap;
-    padding:10px 20px;
-    background:#f4f4f4;
-    border-bottom:1px solid #111;
-}
-
+#map { width:100%; height:calc(100% - 110px); }
+#header-container { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#2c3e50; color:white; }
+#header-buttons button { padding:6px 12px; border:none; border-radius:4px; background:#2980b9; color:white; cursor:pointer; }
+#header-buttons button:hover { background:#3498db; }
+#controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; padding:10px 20px; background:#f4f4f4; border-bottom:1px solid #111; }
 .input-with-button { position: relative; display:inline-block; }
-
-.input-with-button input {
-    width:270px;
-    height:32px;
-    padding:6px 30px 6px 8px;
-    font-size:14px;
-    border-radius:4px;
-    border:1px solid #ccc;
-    box-sizing:border-box;
-}
-
-.input-with-button button {
-    position:absolute;
-    right:4px;
-    top:50%;
-    transform:translateY(-50%);
-    width:20px;
-    height:20px;
-    padding:0;
-    border:none;
-    background:none;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    cursor:pointer;
-    color:#2980b9;
-}
-
+.input-with-button input { width:270px; height:32px; padding:6px 30px 6px 8px; font-size:14px; border-radius:4px; border:1px solid #ccc; box-sizing:border-box; }
+.input-with-button button { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:20px; height:20px; padding:0; border:none; background:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#2980b9; }
 .input-with-button button:hover { color:#3498db; }
-
-#controls button:not(.paste-btn){
-    padding:6px 12px;
-    border-radius:4px;
-    border:none;
-    background:#2980b9;
-    color:white;
-    cursor:pointer;
-}
-
-#controls button:not(.paste-btn):hover{
-    background:#3498db;
-}
-
-/* MAP */
-#map{width:100%; height:calc(100% - 110px);}
-
-/* TOOLBARS */
-.leaflet-top.leaflet-left{ top:10px; left:10px;}
-.leaflet-top.leaflet-right{ top:10px; right:10px;}
-.leaflet-top.leaflet-left .leaflet-draw-toolbar{margin-top:30px;}
-.leaflet-top.leaflet-right .leaflet-draw-toolbar{margin-top:103px;}
-
-.toolbar-label{
-    position:absolute;
-    z-index:1001;
-    font-weight:bold;
-    font-size:14px;
-    padding:2px 6px;
-    border-radius:4px;
-    background:white;
-    text-align:center;
-}
-
-#map .leaflet-top.leaflet-left .toolbar-label{top:3px; left:0;}
-#map .leaflet-top.leaflet-right .toolbar-label{top:77px; right:0; left:auto;}
-
-/* ===== COPY ICON STYLE ===== */
-.copy-btn{
-    background:none;
-    border:none;
-    cursor:pointer;
-    padding:4px;
-    margin-top:4px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-}
-
-.copy-btn svg{
-    width:18px;
-    height:18px;
-    stroke:#2980b9;
-    stroke-width:2;
-    fill:none;
-    transition:0.2s;
-}
-
-.copy-btn:hover svg{
-    stroke:#3498db;
-}
-
-/* Ensure SVG doesn’t block button click */
+#controls button:not(.paste-btn){ padding:6px 12px; border-radius:4px; border:none; background:#2980b9; color:white; cursor:pointer; }
+#controls button:not(.paste-btn):hover{ background:#3498db; }
+.copy-btn{ background:none; border:none; cursor:pointer; padding:2px; display:inline-flex; align-items:center; justify-content:center; }
+.copy-btn svg{ width:18px; height:18px; stroke:#2980b9; stroke-width:2; fill:none; transition:0.2s; }
+.copy-btn:hover svg{ stroke:#3498db; }
+.paste-btn svg { width:16px; height:16px; fill:#2980b9; transition:0.2s; }
+.paste-btn:hover svg { fill:#3498db; }
+.toolbar-label{ position:absolute; z-index:1001; font-weight:bold; font-size:14px; padding:2px 6px; border-radius:4px; background:white; text-align:center; }
 .leaflet-popup-content svg { pointer-events:none; }
+.color-btn { border-radius:3px; }
 </style>
 </head>
 <body>
-
-<div id="site-alert"></div>
 
 <div id="header-container">
   <div>POPMAP</div>
@@ -169,12 +42,16 @@ html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; backgroun
 <div id="controls">
   <div class="input-with-button">
     <input id="start" placeholder="Start lat,lon e.g. 35.189427,33.050308">
-    <button class="paste-btn" data-target="start" title="Paste">&#x1F4CB;</button>
+    <button class="paste-btn" data-target="start" title="Paste">
+      <svg viewBox="0 0 24 24"><path d="M16 2H8C7.4477 2 7 2.4477 7 3V5H5C4.4477 5 4 5.4477 4 6V21C4 21.5523 4.4477 22 5 22H19C19.5523 22 20 21.5523 20 21V6C20 5.4477 19.5523 5 19 5H17V3C17 2.4477 16.5523 2 16 2ZM9 4H15V5H9V4ZM6 7H18V20H6V7Z"/></svg>
+    </button>
   </div>
 
   <div class="input-with-button">
     <input id="goal" placeholder="Goal lat,lon e.g. 35.216094,33.012543">
-    <button class="paste-btn" data-target="goal" title="Paste">&#x1F4CB;</button>
+    <button class="paste-btn" data-target="goal" title="Paste">
+      <svg viewBox="0 0 24 24"><path d="M16 2H8C7.4477 2 7 2.4477 7 3V5H5C4.4477 5 4 5.4477 4 6V21C4 21.5523 4.4477 22 5 22H19C19.5523 22 20 21.5523 20 21V6C20 5.4477 19.5523 5 19 5H17V3C17 2.4477 16.5523 2 16 2ZM9 4H15V5H9V4ZM6 7H18V20H6V7Z"/></svg>
+    </button>
   </div>
 
   <div style="display:flex;align-items:center;gap:5px;">
@@ -192,199 +69,161 @@ html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; backgroun
 <script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
 
 <script>
-// ===== MAP SETUP =====
-let map = L.map('map',{center:[35.029294,33.050995], zoom:11, minZoom:10, maxZoom:16});
-L.tileLayer('static/tiles/{z}/{x}/{y}.png',{noWrap:true, minZoom:10, maxZoom:16}).addTo(map);
+// ===== MAP & GROUPS =====
+let map = L.map('map',{center:[35.029294,33.050995],zoom:11,minZoom:10,maxZoom:16});
+L.tileLayer('static/tiles/{z}/{x}/{y}.png',{noWrap:true,minZoom:10,maxZoom:16}).addTo(map);
 
-// ===== FEATURE GROUPS =====
-let blueItems = new L.FeatureGroup().addTo(map);
-let redItems = new L.FeatureGroup().addTo(map);
-let editableGroup = new L.FeatureGroup().addTo(map);
-editableGroup.addLayer(blueItems);
-editableGroup.addLayer(redItems);
-let pathLayerGroup = new L.FeatureGroup().addTo(map);
+let editableLayers = new L.FeatureGroup().addTo(map);
 let drawings = [];
+let pathLayerGroup = new L.FeatureGroup().addTo(map);
+let lastMarkerClick = null;
 
-// ===== TOOLBARS =====
-function createToolbar(position,color,allowEdit=true){
-    return new L.Control.Draw({
-        position: position,
-        draw:{
-            polygon:{shapeOptions:{color:color}},
-            polyline:{shapeOptions:{color:color}},
-            rectangle:{shapeOptions:{color:color}},
-            circle:{shapeOptions:{color:color}},
-            marker:{icon: new L.Icon.Default()},
-            circlemarker:{color:color, fillColor:color, fillOpacity:1}
-        },
-        edit: allowEdit?{featureGroup: editableGroup, remove:true}:false
+// ===== COLORS & MARKERS =====
+const COLORS = ['blue','red','green','orange','yellow','violet','grey','black'];
+let currentColor = 'blue';
+let markerIcons = {};
+COLORS.forEach(c=>{
+    markerIcons[c] = new L.Icon({
+        iconUrl: `static/leaflet/marker-icon-${c}.png`, // PNGs must exist
+        shadowUrl: 'static/leaflet/marker-shadow.png',
+        iconSize:[25,41],iconAnchor:[12,41],popupAnchor:[1,-34],shadowSize:[41,41]
     });
-}
-let blueToolbar = createToolbar('topleft','blue',true);
-let redToolbar = createToolbar('topright','red',false);
-map.addControl(blueToolbar);
-map.addControl(redToolbar);
+});
 
-// Toolbar labels
-function addToolbarLabel(toolbar,text){
-    const c = toolbar._container;
-    if(!c) return;
-    const existing = c.querySelector('.toolbar-label'); if(existing) existing.remove();
-    const label = L.DomUtil.create('div','toolbar-label',c); label.innerText=text;
-}
-addToolbarLabel(blueToolbar,'Blue');
-addToolbarLabel(redToolbar,'Red');
+// ===== COLOR TOGGLE CONTROL =====
+L.Control.ColorToggle=L.Control.extend({
+    onAdd:function(map){
+        const container=L.DomUtil.create('div','leaflet-bar leaflet-control leaflet-control-custom');
+        container.style.background='white'; container.style.padding='4px'; container.style.borderRadius='4px';
+        container.style.display='flex'; container.style.flexWrap='wrap'; container.style.gap='2px';
+        container.title='Select draw color';
+        COLORS.forEach(c=>{
+            const btn=L.DomUtil.create('div','color-btn',container);
+            btn.style.width='18px'; btn.style.height='18px'; btn.style.background=c; btn.style.cursor='pointer';
+            btn.style.border = c===currentColor?'2px solid black':'1px solid #ccc';
+            btn.addEventListener('click',()=>{
+                currentColor=c;
+                container.querySelectorAll('.color-btn').forEach(el=>el.style.border='1px solid #ccc');
+                btn.style.border='2px solid black';
+            });
+        });
+        return container;
+    },
+    onRemove:function(map){}
+});
+new L.Control.ColorToggle({position:'topleft'}).addTo(map);
 
-// ===== SAVE / FEATURE CONVERSION =====
-function saveDrawings(){ fetch('/save_drawings',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(drawings)}); }
+// ===== DRAW CONTROL =====
+let drawControl=new L.Control.Draw({
+    position:'topleft',
+    draw:{
+        polygon:{shapeOptions:{color:currentColor}},
+        polyline:{shapeOptions:{color:currentColor}},
+        rectangle:{shapeOptions:{color:currentColor}},
+        circle:{shapeOptions:{color:currentColor}},
+        marker:{icon:markerIcons[currentColor]},
+        circlemarker:{color:currentColor, fillColor:currentColor, fillOpacity:1}
+    },
+    edit:{featureGroup:editableLayers, remove:true}
+});
+map.addControl(drawControl);
+
+// ===== HELPERS =====
+function saveDrawings(){
+    fetch('/save_drawings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(drawings)});
+}
+
 function layerToFeature(layer,color){
     if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
-    let feature={type:"Feature", properties:{_id:layer._leaflet_id,deleted:false,color},geometry:{}};
-    if(layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.CircleMarker || layer instanceof L.Polygon || layer instanceof L.Polyline){
-        const ll = layer.getLatLng();
-        feature.geometry={type:"Point",coordinates:[ll.lng,ll.lat]};
-        if(layer instanceof L.Circle) feature.properties.radius = layer.getRadius();
-        else if(layer instanceof L.CircleMarker) feature.properties.isCircleMarker=true;
-        else if(layer instanceof L.Marker) feature.properties.isMarker=true;
-        if(layer instanceof L.Polygon) feature.geometry={type:"Polygon",coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])]};
-        if(layer instanceof L.Polyline) feature.geometry={type:"LineString",coordinates:layer.getLatLngs().map(c=>[c.lng,c.lat])};
-    }
-    return feature;
+    let f={type:"Feature",properties:{_id:layer._leaflet_id,deleted:false,color},geometry:{}};
+    if(layer instanceof L.Marker||layer instanceof L.Circle||layer instanceof L.CircleMarker){
+        const ll=layer.getLatLng();
+        f.geometry={type:"Point",coordinates:[ll.lng,ll.lat]};
+        if(layer instanceof L.Circle) f.properties.radius=layer.getRadius();
+        else if(layer instanceof L.CircleMarker) f.properties.isCircleMarker=true;
+        else if(layer instanceof L.Marker) f.properties.isMarker=true;
+    }else if(layer instanceof L.Polygon) f.geometry={type:"Polygon",coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])]};
+    else if(layer instanceof L.Polyline) f.geometry={type:"LineString",coordinates:layer.getLatLngs().map(c=>[c.lng,c.lat])};
+    return f;
 }
+
 function featureToLayer(f){
-    let layer=null; const g=f.geometry; const color=f.properties.color||'blue';
-    if(g.type==="Polygon") layer=L.polygon(g.coordinates[0].map(c=>[c[1],c[0]]),{color,fillColor:color,fillOpacity:0.5});
-    if(g.type==="LineString") layer=L.polyline(g.coordinates.map(c=>[c[1],c[0]]),{color});
+    let layer=null; const c=f.properties.color||'blue'; const g=f.geometry;
+    if(g.type==="Polygon") layer=L.polygon(g.coordinates[0].map(p=>[p[1],p[0]]),{color:c,fillColor:c,fillOpacity:0.5});
+    if(g.type==="LineString") layer=L.polyline(g.coordinates.map(p=>[p[1],p[0]]),{color:c});
     if(g.type==="Point"){
-        if(f.properties.radius) layer=L.circle([g.coordinates[1],g.coordinates[0]],{radius:f.properties.radius,color});
-        else if(f.properties.isCircleMarker) layer=L.circleMarker([g.coordinates[1],g.coordinates[0]],{color,fillColor:color,fillOpacity:1});
-        else if(f.properties.isMarker) layer=L.marker([g.coordinates[1],g.coordinates[0]]);
+        if(f.properties.radius) layer=L.circle([g.coordinates[1],g.coordinates[0]],{radius:f.properties.radius,color:c});
+        else if(f.properties.isCircleMarker) layer=L.circleMarker([g.coordinates[1],g.coordinates[0]],{color:c,fillColor:c,fillOpacity:1});
+        else if(f.properties.isMarker) layer=L.marker([g.coordinates[1],g.coordinates[0]],{icon:markerIcons[c]});
     }
-    if(layer) layer._leaflet_id = f.properties._id || layer._leaflet_id;
+    if(layer) layer._leaflet_id=f.properties._id||layer._leaflet_id;
     return layer;
 }
 
-// ===== POPUP WITH COPY BUTTON (lon,lat format) =====
-function createPopupContent(lat,lng){
-    const label = `${lng.toFixed(6)}, ${lat.toFixed(6)}`;
-    return `
-        <div>
-            <span class="popup-label">${label}</span><br>
-            <button class="copy-btn" title="Copy">
-                <svg viewBox="0 0 24 24">
-                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-                    <rect x="3" y="3" width="13" height="13" rx="2"></rect>
-                </svg>
-            </button>
-        </div>
-    `;
-}
-
-function bindPopupToLayer(layer){
+function bindPopup(layer){
     if(layer instanceof L.Marker){
-        const ll = layer.getLatLng();
-        layer.bindPopup(createPopupContent(ll.lat,ll.lng));
+        const ll=layer.getLatLng();
+        layer.bindPopup(`<div style="display:flex;align-items:center;gap:6px;">
+            <span class="popup-label">${ll.lng.toFixed(6)},${ll.lat.toFixed(6)}</span>
+            <button class="copy-btn" title="Copy">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><rect x="3" y="3" width="13" height="13" rx="2"></rect></svg>
+            </button>
+        </div>`);
+        layer.on('click',()=>{lastMarkerClick=layer;});
     }
 }
 
-// ===== LOAD EXISTING DRAWINGS =====
+// ===== LOAD EXISTING =====
 fetch('/static/drawings.json').then(r=>r.json()).then(data=>{
-    drawings = data||[];
+    drawings=data||[];
     drawings.forEach(f=>{
-        if(f.properties?.deleted) return;
-        const layer = featureToLayer(f);
-        if(layer){
-            (f.properties.color==='blue'?blueItems:redItems).addLayer(layer);
-            editableGroup.addLayer(layer);
-            if(f.properties.isMarker) bindPopupToLayer(layer);
-        }
+        if(f.properties?.deleted)return;
+        const l=featureToLayer(f);
+        if(l){ editableLayers.addLayer(l); if(f.properties.isMarker) bindPopup(l);}
     });
 });
 
 // ===== DRAW EVENTS =====
 map.on(L.Draw.Event.CREATED,function(e){
-    const layer = e.layer;
-    if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
-    let color = layer.options.color||'blue';
-    const targetGroup = color==='blue'?blueItems:redItems;
-    targetGroup.addLayer(layer);
-    editableGroup.addLayer(layer);
-    drawings.push(layerToFeature(layer,color));
-    if(layer instanceof L.Marker) bindPopupToLayer(layer);
-    saveDrawings();
-});
-map.on(L.Draw.Event.EDITED,function(e){
-    e.layers.eachLayer(layer=>{
-        if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
-        const idx = drawings.findIndex(f=>f.properties._id===layer._leaflet_id);
-        if(idx>=0) drawings[idx]=layerToFeature(layer,drawings[idx].properties.color);
-        if(layer instanceof L.Marker) bindPopupToLayer(layer);
-    });
-    saveDrawings();
-});
-map.on(L.Draw.Event.DELETED,function(e){
-    e.layers.eachLayer(layer=>{
-        if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
-        const f = drawings.find(f=>f.properties._id===layer._leaflet_id);
-        if(f) f.properties.deleted=true;
-    });
-    saveDrawings();
-});
-
-// ===== PATH PLOTTING =====
-function plotPath(){
-    const s = document.getElementById('start').value.split(',');
-    const g = document.getElementById('goal').value.split(',');
-
-    if(s.length!==2 || g.length!==2) return;
-
-    // Since inputs are now lon, lat
-    const start_lon = parseFloat(s[0]), start_lat = parseFloat(s[1]);
-    const goal_lon  = parseFloat(g[0]), goal_lat  = parseFloat(g[1]);
-    const corridor  = document.getElementById('corridorWidth').value;
-
-    fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
-        .then(r=>r.json())
-        .then(res=>{
-            if(!res.path || !res.path.length) return;
-
-            pathLayerGroup.clearLayers();
-            const path = L.polyline(res.path.map(p => [p[0], p[1]]), {color:'red'}).addTo(pathLayerGroup);
-            map.fitBounds(path.getBounds());
-        });
-}
-
-// ===== LAST CLICK TRACKING =====
-map.on('click', function(e){ map.lastClick = e.latlng; });
-
-// ===== LAST MARKER CLICK =====
-let lastMarkerClick = null;
-map.on('layeradd', function(e){
-    if(e.layer instanceof L.Marker){
-        e.layer.on('click', function(){
-            lastMarkerClick = e.layer;
-        });
+    const layer=e.layer; 
+    // Apply color dynamically
+    if(layer instanceof L.Circle||layer instanceof L.CircleMarker||layer instanceof L.Polygon||layer instanceof L.Polyline||layer instanceof L.Rectangle){
+        layer.setStyle({color:currentColor,fillColor:currentColor});
     }
+    if(layer instanceof L.Marker) layer.setIcon(markerIcons[currentColor]);
+    editableLayers.addLayer(layer);
+    drawings.push(layerToFeature(layer,currentColor));
+    if(layer instanceof L.Marker) bindPopup(layer);
+    saveDrawings();
 });
 
-// ===== PASTE BUTTONS =====
-document.querySelectorAll('.paste-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-        const targetId = btn.getAttribute('data-target');
-        const input = document.getElementById(targetId);
-        let ll;
+map.on(L.Draw.Event.EDITED,function(e){e.layers.eachLayer(l=>{
+    const idx=drawings.findIndex(f=>f.properties._id===l._leaflet_id);
+    if(idx>=0) drawings[idx]=layerToFeature(l,drawings[idx].properties.color);
+});saveDrawings();});
 
-        if(lastMarkerClick){
-            ll = lastMarkerClick.getLatLng();
-        } else if(map.lastClick){
-            ll = map.lastClick;
-        } else {
-            ll = map.getCenter();
-        }
+map.on(L.Draw.Event.DELETED,function(e){e.layers.eachLayer(l=>{
+    const f=drawings.find(f=>f.properties._id===l._leaflet_id);
+    if(f) f.properties.deleted=true;
+});saveDrawings();});
 
-        // Paste in LON, LAT format
-        input.value = ll.lng.toFixed(6)+','+ll.lat.toFixed(6);
-    });
+// ===== PASTE & COPY =====
+map.on('click',e=>map.lastClick=e.latlng);
+document.querySelectorAll('.paste-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    const targetId=btn.getAttribute('data-target');
+    const input=document.getElementById(targetId);
+    let ll=lastMarkerClick?lastMarkerClick.getLatLng():map.lastClick||map.getCenter();
+    input.value=ll.lng.toFixed(6)+','+ll.lat.toFixed(6);
+}));
+
+document.addEventListener('click',e=>{
+    const btn=e.target.closest('.copy-btn'); if(!btn)return;
+    const popup=btn.closest('.leaflet-popup-content'); if(!popup)return;
+    const labelEl=popup.querySelector('.popup-label'); if(!labelEl)return;
+    const text=labelEl.textContent.trim();
+    if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text);}
+    else{const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";
+    document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);}
 });
 
 // ===== CORRIDOR SLIDER =====
@@ -392,30 +231,20 @@ document.getElementById('corridorWidth').addEventListener('input',function(){
     document.getElementById('corridorValue').textContent=this.value;
 });
 
-// ===== COPY BUTTON HANDLER =====
-document.addEventListener('click', function(e){
-    const btn = e.target.closest('.copy-btn');
-    if(!btn) return;
-    const popup = btn.closest('.leaflet-popup-content');
-    if(!popup) return;
-    const labelEl = popup.querySelector('.popup-label');
-    if(!labelEl) return;
-    const textToCopy = labelEl.textContent.trim();
-
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(textToCopy);
-    } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = textToCopy;
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-    }
-});
+// ===== PATH PLOTTING =====
+function plotPath(){
+    const s=document.getElementById('start').value.split(',');
+    const g=document.getElementById('goal').value.split(',');
+    if(s.length!==2||g.length!==2) return;
+    const start_lon=parseFloat(s[0]), start_lat=parseFloat(s[1]);
+    const goal_lon=parseFloat(g[0]), goal_lat=parseFloat(g[1]);
+    const corridor=document.getElementById('corridorWidth').value;
+    fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
+        .then(r=>r.json()).then(res=>{if(!res.path||!res.path.length)return;
+        pathLayerGroup.clearLayers(); const path=L.polyline(res.path.map(p=>[p[0],p[1]]),{color:'red'}).addTo(pathLayerGroup);
+        map.fitBounds(path.getBounds());
+    });
+}
 </script>
 </body>
 </html>
