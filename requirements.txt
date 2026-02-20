@@ -5,3 +5,4 @@ flask
 os 
 math 
 requests
+shapely

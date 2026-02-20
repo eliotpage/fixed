@@ -3,469 +3,419 @@
 <head>
 <meta charset="UTF-8">
 <title>POPMAP</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
+
+<link rel="stylesheet" href="static/leaflet/leaflet.css"/>
+<link rel="stylesheet" href="static/leaflet-draw/dist/leaflet.draw.css"/>
+
 <style>
-html,body{height:100%;margin:0;font-family:"Segoe UI",sans-serif;background:#f4f4f4;}
-#header-container{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:#2c3e50;color:white;}
-#header-buttons button{padding:6px 12px;border:none;border-radius:4px;background:#2980b9;color:white;cursor:pointer;}
-#header-buttons button:hover{background:#3498db;}
+html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; background:#f4f4f4; }
+
+/* SITE ALERT */
+#site-alert {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #f44336;
+    color:white;
+    padding:10px 20px;
+    border-radius:4px;
+    display:none;
+    z-index:9999;
+    box-shadow:0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* HEADER */
+#header-container {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 20px;
+    background:#2c3e50;
+    color:white;
+}
+
+#header-buttons button {
+    padding:6px 12px;
+    border:none;
+    border-radius:4px;
+    background:#2980b9;
+    color:white;
+    cursor:pointer;
+}
+
+#header-buttons button:hover {
+    background:#3498db;
+}
+
+/* CONTROLS */
 #controls {
-    display: flex;
-    justify-content: center;   /* center horizontally */
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 10px 20px;
-    background-color: #f4f4f4; /* match missing tiles */
-    border-bottom: 1px solid #111;
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:10px 20px;
+    background:#f4f4f4;
+    border-bottom:1px solid #111;
 }
 
-#controls input {
-    padding: 6px 10px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    width: 180px;
-    font-size: 14px;           /* match login inputs */
-    background-color: #f4f4f4; /* match missing tile background */
+.input-with-button { position: relative; display:inline-block; }
+
+.input-with-button input {
+    width:270px;
+    height:32px;
+    padding:6px 30px 6px 8px;
+    font-size:14px;
+    border-radius:4px;
+    border:1px solid #ccc;
+    box-sizing:border-box;
 }
 
-#controls button {
-    padding: 6px 14px;
-    border-radius: 4px;
-    border: none;
-    background: #2980b9;
-    color: white;
-    cursor: pointer;
+.input-with-button button {
+    position:absolute;
+    right:4px;
+    top:50%;
+    transform:translateY(-50%);
+    width:20px;
+    height:20px;
+    padding:0;
+    border:none;
+    background:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    color:#2980b9;
 }
 
-#controls button:hover {
-    background: #3498db;
+.input-with-button button:hover { color:#3498db; }
+
+#controls button:not(.paste-btn){
+    padding:6px 12px;
+    border-radius:4px;
+    border:none;
+    background:#2980b9;
+    color:white;
+    cursor:pointer;
 }
 
-#map {
-    width: 100%;
-    height: calc(100% - 110px); /* leave space for header + controls */
+#controls button:not(.paste-btn):hover{
+    background:#3498db;
 }
 
+/* MAP */
+#map{width:100%; height:calc(100% - 110px);}
+
+/* TOOLBARS */
+.leaflet-top.leaflet-left{ top:10px; left:10px;}
+.leaflet-top.leaflet-right{ top:10px; right:10px;}
+.leaflet-top.leaflet-left .leaflet-draw-toolbar{margin-top:30px;}
+.leaflet-top.leaflet-right .leaflet-draw-toolbar{margin-top:103px;}
+
+.toolbar-label{
+    position:absolute;
+    z-index:1001;
+    font-weight:bold;
+    font-size:14px;
+    padding:2px 6px;
+    border-radius:4px;
+    background:white;
+    text-align:center;
+}
+
+#map .leaflet-top.leaflet-left .toolbar-label{top:3px; left:0;}
+#map .leaflet-top.leaflet-right .toolbar-label{top:77px; right:0; left:auto;}
+
+/* ===== COPY ICON STYLE ===== */
+.copy-btn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:4px;
+    margin-top:4px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.copy-btn svg{
+    width:18px;
+    height:18px;
+    stroke:#2980b9;
+    stroke-width:2;
+    fill:none;
+    transition:0.2s;
+}
+
+.copy-btn:hover svg{
+    stroke:#3498db;
+}
+
+/* Ensure SVG doesn’t block button click */
+.leaflet-popup-content svg { pointer-events:none; }
 </style>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
 </head>
 <body>
 
+<div id="site-alert"></div>
+
 <div id="header-container">
-    <div>POPMAP</div>
-    <div id="header-buttons">
-        <button onclick="location.href='/logout'">Logout</button>
-    </div>
+  <div>POPMAP</div>
+  <div id="header-buttons">
+    <button onclick="location.href='/logout'">Logout</button>
+  </div>
 </div>
 
-<!-- Separate banner for pathfinding controls -->
 <div id="controls">
+  <div class="input-with-button">
     <input id="start" placeholder="Start lat,lon e.g. 35.189427,33.050308">
+    <button class="paste-btn" data-target="start" title="Paste">&#x1F4CB;</button>
+  </div>
+
+  <div class="input-with-button">
     <input id="goal" placeholder="Goal lat,lon e.g. 35.216094,33.012543">
-    <button onclick="plotPath()">Show Path</button>
+    <button class="paste-btn" data-target="goal" title="Paste">&#x1F4CB;</button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:5px;">
+    <label for="corridorWidth">Corridor width:</label>
+    <input type="range" id="corridorWidth" min="10" max="500" step="10" value="50">
+    <span id="corridorValue">50</span> m
+  </div>
+
+  <button onclick="plotPath()">Show Path</button>
 </div>
 
 <div id="map"></div>
 
+<script src="static/leaflet/leaflet.js"></script>
+<script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
+
 <script>
+// ===== MAP SETUP =====
+let map = L.map('map',{center:[35.029294,33.050995], zoom:11, minZoom:10, maxZoom:16});
+L.tileLayer('static/tiles/{z}/{x}/{y}.png',{noWrap:true, minZoom:10, maxZoom:16}).addTo(map);
 
-var drawnItems = new L.FeatureGroup();
-var pathLayer;
-var startMarker = null;
-var goalMarker = null;
-var drawings = [];
+// ===== FEATURE GROUPS =====
+let blueItems = new L.FeatureGroup().addTo(map);
+let redItems = new L.FeatureGroup().addTo(map);
+let editableGroup = new L.FeatureGroup().addTo(map);
+editableGroup.addLayer(blueItems);
+editableGroup.addLayer(redItems);
+let pathLayerGroup = new L.FeatureGroup().addTo(map);
+let drawings = [];
 
-// ================= LOAD MAP =================
-
-fetch('/tile_bounds')
-.then(r => r.json())
-.then(data => {
-
-    if (data.error) {
-        alert(data.error);
-        return;
-    }
-
-    var bounds = data.bounds;
-    var center = data.center;
-    var minZoom = data.minZoom;
-    var maxZoom = data.maxZoom;
-
-    // Create map
-    var map = L.map('map', {
-        center: center,
-        zoom: 11,
-        minZoom: minZoom,
-        maxZoom: maxZoom
-    });
-
-    // Tile layers
-    L.tileLayer('static/tiles/{z}/{x}/{y}.png', {
-        minZoom: minZoom,
-        maxZoom: 10,
-        noWrap: true
-    }).addTo(map);
-
-    L.tileLayer('static/tiles/{z}/{x}/{y}.png', {
-        minZoom: 11,
-        maxZoom: maxZoom,
-        noWrap: true
-    }).addTo(map);
-
-
-    // Restrict panning at zoom >= 11
-    function updateBounds() {
-        if (map.getZoom() >= 11) {
-            map.setMaxBounds(bounds);
-            map.options.maxBoundsViscosity = 1.0;
-        } else {
-            map.setMaxBounds(null);
-        }
-    }
-
-    updateBounds();
-    map.on('zoomend', updateBounds);
-
-
-    // ================= DRAW TOOLS =================
-
-    map.addLayer(drawnItems);
-
-    var drawControl = new L.Control.Draw({
-        edit: {
-            featureGroup: drawnItems
+// ===== TOOLBARS =====
+function createToolbar(position,color,allowEdit=true){
+    return new L.Control.Draw({
+        position: position,
+        draw:{
+            polygon:{shapeOptions:{color:color}},
+            polyline:{shapeOptions:{color:color}},
+            rectangle:{shapeOptions:{color:color}},
+            circle:{shapeOptions:{color:color}},
+            marker:{icon: new L.Icon.Default()},
+            circlemarker:{color:color, fillColor:color, fillOpacity:1}
         },
-        draw: {
-            polygon: true,
-            polyline: true,
-            rectangle: true,
-            circle: true,
-            circlemarker: true,
-            marker: true
-        }
+        edit: allowEdit?{featureGroup: editableGroup, remove:true}:false
     });
-
-    map.addControl(drawControl);
-
-
-    // ================= LOAD DRAWINGS =================
-
-    fetch('/static/drawings.json')
-    .then(r => r.json())
-    .then(data => {
-
-        drawings = data || [];
-
-        drawings.forEach(f => {
-
-            // Skip deleted
-            if (f.properties && f.properties.deleted) return;
-
-            let layer = featureToLayer(f);
-
-            if (layer) {
-                drawnItems.addLayer(layer);
-                bindPopupToLayer(layer);
-            }
-        });
-
-    });
-
-
-    // ================= DRAW EVENTS =================
-
-    // Created
-    map.on(L.Draw.Event.CREATED, e => {
-
-        drawnItems.addLayer(e.layer);
-
-        let feature = layerToFeature(e.layer);
-
-        // Ensure not deleted
-        feature.properties.deleted = false;
-
-        drawings.push(feature);
-
-        bindPopupToLayer(e.layer);
-
-        saveDrawings();
-    });
-
-
-    // Edited
-    map.on(L.Draw.Event.EDITED, e => {
-
-        e.layers.eachLayer(layer => {
-
-            let idx = drawings.findIndex(
-                f => f.properties._id === layer._leaflet_id
-            );
-
-            if (idx >= 0) {
-                drawings[idx] = layerToFeature(layer);
-                drawings[idx].properties.deleted = false;
-            }
-
-        });
-
-        saveDrawings();
-    });
-
-
-    // Deleted (soft delete)
-    map.on(L.Draw.Event.DELETED, e => {
-
-        e.layers.eachLayer(layer => {
-
-            let feature = drawings.find(
-                f => f.properties._id === layer._leaflet_id
-            );
-
-            if (feature) {
-                feature.properties.deleted = true;
-            }
-
-        });
-
-        saveDrawings();
-    });
-
-
-    // ================= PATHFINDING =================
-
-    window.plotPath = function () {
-
-        let s = document.getElementById('start').value.split(',');
-        let g = document.getElementById('goal').value.split(',');
-
-        if (s.length !== 2 || g.length !== 2) {
-            alert("Invalid input");
-            return;
-        }
-
-        let start_lat = parseFloat(s[0]);
-        let start_lon = parseFloat(s[1]);
-        let goal_lat = parseFloat(g[0]);
-        let goal_lon = parseFloat(g[1]);
-
-        if (
-            isNaN(start_lat) ||
-            isNaN(start_lon) ||
-            isNaN(goal_lat) ||
-            isNaN(goal_lon)
-        ) {
-            alert("Coords must be numbers");
-            return;
-        }
-
-        fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}`)
-        .then(res => res.json())
-        .then(path => {
-
-            if (path.error) {
-                alert(path.error);
-                return;
-            }
-
-            // Remove old path + markers
-            if (pathLayer) drawnItems.removeLayer(pathLayer);
-            if (startMarker) drawnItems.removeLayer(startMarker);
-            if (goalMarker) drawnItems.removeLayer(goalMarker);
-
-
-            // Draw path
-            pathLayer = L.polyline(
-                path.map(p => [p[0], p[1]]),
-                { color: 'red', weight: 3 }
-            ).addTo(drawnItems);
-
-
-            // Start marker
-            startMarker = L.marker([path[0][0], path[0][1]])
-                .addTo(drawnItems)
-                .bindPopup(formatCoords(path[0][0], path[0][1]));
-
-
-            // Goal marker
-            let last = path[path.length - 1];
-
-            goalMarker = L.marker([last[0], last[1]])
-                .addTo(drawnItems)
-                .bindPopup(formatCoords(last[0], last[1]));
-
-
-            map.fitBounds(pathLayer.getBounds());
-
-        });
-    };
-
-});
-
-
-// ================= HELPERS =================
-
-
-// Convert saved feature → leaflet layer
-function featureToLayer(f) {
-
-    var layer = null;
-
-    if (f.type === "Feature") {
-
-        var g = f.geometry;
-
-        if (g.type === "Polygon") {
-            layer = L.polygon(
-                g.coordinates[0].map(c => [c[1], c[0]])
-            );
-        }
-
-        else if (g.type === "LineString") {
-            layer = L.polyline(
-                g.coordinates.map(c => [c[1], c[0]])
-            );
-        }
-
-        else if (g.type === "Point") {
-
-            if (f.properties && f.properties.radius) {
-                layer = L.circle(
-                    [g.coordinates[1], g.coordinates[0]],
-                    { radius: f.properties.radius }
-                );
-            }
-
-            else if (f.properties && f.properties.isCircleMarker) {
-                layer = L.circleMarker(
-                    [g.coordinates[1], g.coordinates[0]]
-                );
-            }
-
-            else {
-                layer = L.marker(
-                    [g.coordinates[1], g.coordinates[0]]
-                );
-            }
-        }
+}
+let blueToolbar = createToolbar('topleft','blue',true);
+let redToolbar = createToolbar('topright','red',false);
+map.addControl(blueToolbar);
+map.addControl(redToolbar);
+
+// Toolbar labels
+function addToolbarLabel(toolbar,text){
+    const c = toolbar._container;
+    if(!c) return;
+    const existing = c.querySelector('.toolbar-label'); if(existing) existing.remove();
+    const label = L.DomUtil.create('div','toolbar-label',c); label.innerText=text;
+}
+addToolbarLabel(blueToolbar,'Blue');
+addToolbarLabel(redToolbar,'Red');
+
+// ===== SAVE / FEATURE CONVERSION =====
+function saveDrawings(){ fetch('/save_drawings',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(drawings)}); }
+function layerToFeature(layer,color){
+    if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
+    let feature={type:"Feature", properties:{_id:layer._leaflet_id,deleted:false,color},geometry:{}};
+    if(layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.CircleMarker || layer instanceof L.Polygon || layer instanceof L.Polyline){
+        const ll = layer.getLatLng();
+        feature.geometry={type:"Point",coordinates:[ll.lng,ll.lat]};
+        if(layer instanceof L.Circle) feature.properties.radius = layer.getRadius();
+        else if(layer instanceof L.CircleMarker) feature.properties.isCircleMarker=true;
+        else if(layer instanceof L.Marker) feature.properties.isMarker=true;
+        if(layer instanceof L.Polygon) feature.geometry={type:"Polygon",coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])]};
+        if(layer instanceof L.Polyline) feature.geometry={type:"LineString",coordinates:layer.getLatLngs().map(c=>[c.lng,c.lat])};
     }
-
-    if (layer) {
-        layer._leaflet_id = f.properties._id || layer._leaflet_id;
+    return feature;
+}
+function featureToLayer(f){
+    let layer=null; const g=f.geometry; const color=f.properties.color||'blue';
+    if(g.type==="Polygon") layer=L.polygon(g.coordinates[0].map(c=>[c[1],c[0]]),{color,fillColor:color,fillOpacity:0.5});
+    if(g.type==="LineString") layer=L.polyline(g.coordinates.map(c=>[c[1],c[0]]),{color});
+    if(g.type==="Point"){
+        if(f.properties.radius) layer=L.circle([g.coordinates[1],g.coordinates[0]],{radius:f.properties.radius,color});
+        else if(f.properties.isCircleMarker) layer=L.circleMarker([g.coordinates[1],g.coordinates[0]],{color,fillColor:color,fillOpacity:1});
+        else if(f.properties.isMarker) layer=L.marker([g.coordinates[1],g.coordinates[0]]);
     }
-
+    if(layer) layer._leaflet_id = f.properties._id || layer._leaflet_id;
     return layer;
 }
 
-
-// Convert leaflet layer → feature
-function layerToFeature(layer) {
-
-    var feature = {
-        type: "Feature",
-        properties: {
-            _id: layer._leaflet_id,
-            deleted: false
-        },
-        geometry: {}
-    };
-
-    if (layer instanceof L.Marker) {
-
-        feature.geometry = {
-            type: "Point",
-            coordinates: [
-                layer.getLatLng().lng,
-                layer.getLatLng().lat
-            ]
-        };
-    }
-
-    else if (layer instanceof L.Circle) {
-
-        feature.geometry = {
-            type: "Point",
-            coordinates: [
-                layer.getLatLng().lng,
-                layer.getLatLng().lat
-            ]
-        };
-
-        feature.properties.radius = layer.getRadius();
-    }
-
-    else if (layer instanceof L.CircleMarker) {
-
-        feature.geometry = {
-            type: "Point",
-            coordinates: [
-                layer.getLatLng().lng,
-                layer.getLatLng().lat
-            ]
-        };
-
-        feature.properties.isCircleMarker = true;
-    }
-
-    else if (layer instanceof L.Polygon && !(layer instanceof L.Circle)) {
-
-        feature.geometry = {
-            type: "Polygon",
-            coordinates: [
-                layer.getLatLngs()[0].map(c => [c.lng, c.lat])
-            ]
-        };
-    }
-
-    else if (layer instanceof L.Polyline) {
-
-        feature.geometry = {
-            type: "LineString",
-            coordinates: layer.getLatLngs().map(c => [c.lng, c.lat])
-        };
-    }
-
-    return feature;
+// ===== POPUP WITH COPY BUTTON (lon,lat format) =====
+function createPopupContent(lat,lng){
+    const label = `${lng.toFixed(6)}, ${lat.toFixed(6)}`;
+    return `
+        <div>
+            <span class="popup-label">${label}</span><br>
+            <button class="copy-btn" title="Copy">
+                <svg viewBox="0 0 24 24">
+                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                    <rect x="3" y="3" width="13" height="13" rx="2"></rect>
+                </svg>
+            </button>
+        </div>
+    `;
 }
 
-
-// Show coords on click
-function bindPopupToLayer(layer) {
-
-    if (
-        layer instanceof L.Marker ||
-        layer instanceof L.Circle ||
-        layer instanceof L.CircleMarker
-    ) {
-
-        let ll = layer.getLatLng();
-
-        layer.bindPopup(
-            formatCoords(ll.lat, ll.lng)
-        );
+function bindPopupToLayer(layer){
+    if(layer instanceof L.Marker){
+        const ll = layer.getLatLng();
+        layer.bindPopup(createPopupContent(ll.lat,ll.lng));
     }
 }
 
-
-// Format coordinate popup
-function formatCoords(lat, lon) {
-
-    return `Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`;
-}
-
-
-// Save to server
-function saveDrawings() {
-
-    fetch('/save_drawings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(drawings)
+// ===== LOAD EXISTING DRAWINGS =====
+fetch('/static/drawings.json').then(r=>r.json()).then(data=>{
+    drawings = data||[];
+    drawings.forEach(f=>{
+        if(f.properties?.deleted) return;
+        const layer = featureToLayer(f);
+        if(layer){
+            (f.properties.color==='blue'?blueItems:redItems).addLayer(layer);
+            editableGroup.addLayer(layer);
+            if(f.properties.isMarker) bindPopupToLayer(layer);
+        }
     });
+});
+
+// ===== DRAW EVENTS =====
+map.on(L.Draw.Event.CREATED,function(e){
+    const layer = e.layer;
+    if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
+    let color = layer.options.color||'blue';
+    const targetGroup = color==='blue'?blueItems:redItems;
+    targetGroup.addLayer(layer);
+    editableGroup.addLayer(layer);
+    drawings.push(layerToFeature(layer,color));
+    if(layer instanceof L.Marker) bindPopupToLayer(layer);
+    saveDrawings();
+});
+map.on(L.Draw.Event.EDITED,function(e){
+    e.layers.eachLayer(layer=>{
+        if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
+        const idx = drawings.findIndex(f=>f.properties._id===layer._leaflet_id);
+        if(idx>=0) drawings[idx]=layerToFeature(layer,drawings[idx].properties.color);
+        if(layer instanceof L.Marker) bindPopupToLayer(layer);
+    });
+    saveDrawings();
+});
+map.on(L.Draw.Event.DELETED,function(e){
+    e.layers.eachLayer(layer=>{
+        if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
+        const f = drawings.find(f=>f.properties._id===layer._leaflet_id);
+        if(f) f.properties.deleted=true;
+    });
+    saveDrawings();
+});
+
+// ===== PATH PLOTTING =====
+function plotPath(){
+    const s = document.getElementById('start').value.split(',');
+    const g = document.getElementById('goal').value.split(',');
+
+    if(s.length!==2 || g.length!==2) return;
+
+    // Since inputs are now lon, lat
+    const start_lon = parseFloat(s[0]), start_lat = parseFloat(s[1]);
+    const goal_lon  = parseFloat(g[0]), goal_lat  = parseFloat(g[1]);
+    const corridor  = document.getElementById('corridorWidth').value;
+
+    fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
+        .then(r=>r.json())
+        .then(res=>{
+            if(!res.path || !res.path.length) return;
+
+            pathLayerGroup.clearLayers();
+            const path = L.polyline(res.path.map(p => [p[0], p[1]]), {color:'red'}).addTo(pathLayerGroup);
+            map.fitBounds(path.getBounds());
+        });
 }
 
-</script>
+// ===== LAST CLICK TRACKING =====
+map.on('click', function(e){ map.lastClick = e.latlng; });
 
+// ===== LAST MARKER CLICK =====
+let lastMarkerClick = null;
+map.on('layeradd', function(e){
+    if(e.layer instanceof L.Marker){
+        e.layer.on('click', function(){
+            lastMarkerClick = e.layer;
+        });
+    }
+});
+
+// ===== PASTE BUTTONS =====
+document.querySelectorAll('.paste-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+        const targetId = btn.getAttribute('data-target');
+        const input = document.getElementById(targetId);
+        let ll;
+
+        if(lastMarkerClick){
+            ll = lastMarkerClick.getLatLng();
+        } else if(map.lastClick){
+            ll = map.lastClick;
+        } else {
+            ll = map.getCenter();
+        }
+
+        // Paste in LON, LAT format
+        input.value = ll.lng.toFixed(6)+','+ll.lat.toFixed(6);
+    });
+});
+
+// ===== CORRIDOR SLIDER =====
+document.getElementById('corridorWidth').addEventListener('input',function(){
+    document.getElementById('corridorValue').textContent=this.value;
+});
+
+// ===== COPY BUTTON HANDLER =====
+document.addEventListener('click', function(e){
+    const btn = e.target.closest('.copy-btn');
+    if(!btn) return;
+    const popup = btn.closest('.leaflet-popup-content');
+    if(!popup) return;
+    const labelEl = popup.querySelector('.popup-label');
+    if(!labelEl) return;
+    const textToCopy = labelEl.textContent.trim();
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(textToCopy);
+    } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = textToCopy;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+    }
+});
+</script>
 </body>
 </html>
