@@ -25,6 +25,7 @@ class DStarLite:
 
         # Default cost map: all 1 (traversable)
         self.cost_map = np.ones_like(self.elev, dtype=float)
+        self.base_cost_map = None  # Store base cost map for resetting
 
         # Hostile mask and distance slope
         self.hostile_mask = np.zeros_like(self.elev, dtype=bool)
@@ -32,6 +33,8 @@ class DStarLite:
         # If tiles provided, build cost map from roads/water
         if tile_dir:
             self.build_cost_map_from_tiles(tile_dir, zoom)
+            # Save a copy of the base cost map (before hostile zones)
+            self.base_cost_map = self.cost_map.copy()
 
     # ================= Helper functions =================
     def latlon_to_index(self, lat, lon):
@@ -110,47 +113,107 @@ class DStarLite:
     # ================== HOSTILE ZONES =================
     def apply_hostile_zones(self, hostile_features, influence_radius_m=100, cost_multiplier=10):
         """ Rasterizes hostile shapes as impassable. Distance-based cost slope starts from the nearest point. """
+        # Reset cost map to base state before applying new hostile zones
+        if self.base_cost_map is not None:
+            self.cost_map = self.base_cost_map.copy()
+        else:
+            self.cost_map = np.ones_like(self.elev, dtype=float)
+        
+        # Reset hostile mask
         self.hostile_mask = np.zeros_like(self.elev, dtype=bool)
+        
+        if not hostile_features:
+            return  # No hostile features to apply
+        
+        print(f"[Hostile] Processing {len(hostile_features)} hostile features...")
+        
         for f in hostile_features:
             geom = None
-            if f['geometry']['type'] == 'Point':
-                geom = Point(f['geometry']['coordinates'][0], f['geometry']['coordinates'][1])
-            elif f['geometry']['type'] == 'Polygon':
-                geom = Polygon(f['geometry']['coordinates'][0])
-            elif f['geometry']['type'] == 'LineString':
-                geom = LineString(f['geometry']['coordinates'])
+            geom_type = f['geometry']['type']
+            coords = f['geometry']['coordinates']
+            
+            if geom_type == 'Point':
+                geom = Point(coords[0], coords[1])
+            elif geom_type == 'Polygon':
+                geom = Polygon(coords[0])
+            elif geom_type == 'LineString':
+                geom = LineString(coords)
+            elif geom_type == 'Circle':
+                # Handle circles (stored as Point with radius)
+                geom = Point(coords[0], coords[1])
             else:
                 continue
 
-            # Rasterize shape
-            min_row, min_col, max_row, max_col = self.rows, self.cols, 0, 0
-            if geom.geom_type == 'Point':
-                row, col = self.latlon_to_index(geom.y, geom.x)
-                if self.in_bounds(row, col):
-                    self.hostile_mask[row, col] = True
-            else:
-                # Iterate DEM grid and mark cells inside polygon or on lines
-                for r in range(self.rows):
-                    for c in range(self.cols):
-                        lat, lon = self.index_to_latlon(r, c)
-                        cell_point = Point(lon, lat)
-                        if geom.geom_type == 'Polygon' and geom.contains(cell_point):
+            # Get bounding box of geometry in lat/lon
+            bounds = geom.bounds  # (minx, miny, maxx, maxy)
+            
+            # Convert bounding box to pixel indices with buffer
+            buffer_cells = 50  # Add buffer to ensure we catch everything
+            min_r, min_c = self.latlon_to_index(bounds[3], bounds[0])  # top-left (miny = bottom)
+            max_r, max_c = self.latlon_to_index(bounds[1], bounds[2])  # bottom-right
+            
+            # Ensure correct order and add buffer
+            min_r, max_r = min(min_r, max_r) - buffer_cells, max(min_r, max_r) + buffer_cells
+            min_c, max_c = min(min_c, max_c) - buffer_cells, max(min_c, max_c) + buffer_cells
+            
+            # Clip to DEM bounds
+            min_r = max(0, min_r)
+            max_r = min(self.rows - 1, max_r)
+            min_c = max(0, min_c)
+            max_c = min(self.cols - 1, max_c)
+            
+            # Rasterize within bounding box only
+            marked_in_feature = 0
+            for r in range(min_r, max_r + 1):
+                for c in range(min_c, max_c + 1):
+                    lat, lon = self.index_to_latlon(r, c)
+                    cell_point = Point(lon, lat)
+                    
+                    # Check if point is inside/near the geometry
+                    if geom_type == 'Polygon':
+                        if geom.contains(cell_point) or geom.boundary.distance(cell_point) < 0.0001:
                             self.hostile_mask[r, c] = True
-                        elif geom.geom_type == 'LineString':
-                            nearest = nearest_points(geom, cell_point)[0]
-                            dist_m = self.latlon_distance(lat, lon, nearest.y, nearest.x)
-                            if dist_m < 1:  # <1 meter threshold
-                                self.hostile_mask[r, c] = True
+                            marked_in_feature += 1
+                    elif geom_type == 'LineString':
+                        # Check distance to line (make lines thicker)
+                        dist_deg = geom.distance(cell_point)
+                        dist_m = dist_deg * 111000  # Rough conversion
+                        if dist_m < 50:  # 50 meter buffer for lines
+                            self.hostile_mask[r, c] = True
+                            marked_in_feature += 1
+                    elif geom_type == 'Point' or geom_type == 'Circle':
+                        # Mark area around point
+                        dist_m = self.latlon_distance(lat, lon, geom.y, geom.x)
+                        radius = f['properties'].get('radius', 50)  # Default 50m radius
+                        if dist_m < radius:
+                            self.hostile_mask[r, c] = True
+                            marked_in_feature += 1
+            
+            print(f"  - Marked {marked_in_feature} cells for {geom_type} feature (ID: {f['properties']['_id']})")
 
-        # Impassable
+        # Impassable - set cost to 0 (infinite cost)
+        hostile_count = np.sum(self.hostile_mask)
+        print(f"[Hostile Zones] Total hostile cells marked: {hostile_count}")
+        
+        # Set hostile cells to 0 (impassable)
         self.cost_map[self.hostile_mask] = 0
-
-        # Distance-based slope
-        inv_mask = ~self.hostile_mask
-        distance_cells = distance_transform_edt(inv_mask)
-        meters_per_pixel = np.mean(self.dem.res) * 111000
-        distance_m = distance_cells * meters_per_pixel
-        self.cost_map += np.clip((influence_radius_m - distance_m) / influence_radius_m * cost_multiplier, 0, cost_multiplier)
+        
+        if hostile_count > 0:
+            # Distance-based slope for cells NEAR hostile zones (influence area)
+            inv_mask = ~self.hostile_mask
+            distance_cells = distance_transform_edt(inv_mask)
+            meters_per_pixel = np.mean(self.dem.res) * 111000
+            distance_m = distance_cells * meters_per_pixel
+            
+            # Calculate influence cost (higher near hostile zones)
+            influence_cost = np.clip((influence_radius_m - distance_m) / influence_radius_m * cost_multiplier, 0, cost_multiplier)
+            
+            # Only add influence to non-hostile cells
+            self.cost_map[~self.hostile_mask] += influence_cost[~self.hostile_mask]
+            
+            print(f"[Hostile Zones] Applied {len(hostile_features)} hostile features")
+            print(f"[Hostile Zones] {hostile_count} cells are completely impassable (cost=0)")
+            print(f"[Hostile Zones] Influence radius: {influence_radius_m}m around hostile zones")
 
     def latlon_distance(self, lat1, lon1, lat2, lon2):
         """ Haversine formula to calculate distance between two lat/lon points. """
@@ -170,6 +233,15 @@ class DStarLite:
         if debug:
             debug_msgs.append(f"Start indices: {start_r},{start_c}")
             debug_msgs.append(f"Goal indices: {goal_r},{goal_c}")
+            debug_msgs.append(f"Start cell cost: {self.cost_map[start_r, start_c]}")
+            debug_msgs.append(f"Goal cell cost: {self.cost_map[goal_r, goal_c]}")
+            debug_msgs.append(f"Hostile cells in map: {np.sum(self.hostile_mask)}")
+            
+            # Check if start or goal is in hostile zone
+            if self.hostile_mask[start_r, start_c]:
+                debug_msgs.append("WARNING: Start point is in a hostile zone!")
+            if self.hostile_mask[goal_r, goal_c]:
+                debug_msgs.append("WARNING: Goal point is in a hostile zone!")
 
         meters_per_pixel = np.mean(self.dem.res) * 111000  # Conversion factor to meters
         corridor_cells = int(corridor_m / meters_per_pixel) if corridor_m else 0
@@ -189,6 +261,7 @@ class DStarLite:
         came_from = {(start_r, start_c): None}
         cost_so_far = {(start_r, start_c): 0}
         steps = 0
+        skipped_hostile = 0  # Track how many hostile cells were skipped
 
         while frontier:
             steps += 1
@@ -197,10 +270,17 @@ class DStarLite:
             if (r, c) == (goal_r, goal_c):
                 if debug:
                     debug_msgs.append(f"Goal reached in {steps} steps")
+                    debug_msgs.append(f"Skipped {skipped_hostile} hostile cells during pathfinding")
                 break
 
             for nr, nc in self.neighbors(r, c, corridor=(min_r, max_r, min_c, max_c)):
                 new_cost = cost_so_far[(r, c)] + self.cost(r, c, nr, nc)
+                
+                # Skip cells with infinite cost (hostile zones)
+                if new_cost == float('inf'):
+                    skipped_hostile += 1
+                    continue
+                    
                 if (nr, nc) not in cost_so_far or new_cost < cost_so_far[(nr, nc)]:
                     cost_so_far[(nr, nc)] = new_cost
                     heapq.heappush(frontier, (new_cost + self.heuristic(nr, nc, goal_r, goal_c), (nr, nc)))
@@ -211,6 +291,15 @@ class DStarLite:
 
         # Reconstruct path
         path = []
+        
+        # Check if we actually reached the goal
+        if (goal_r, goal_c) not in came_from:
+            if debug:
+                debug_msgs.append("FAILED: Goal was never reached - likely blocked by hostile zones")
+                debug_msgs.append(f"Total cells explored: {len(came_from)}")
+                debug_msgs.append(f"Hostile cells skipped: {skipped_hostile}")
+            return path, debug_msgs
+        
         current = (goal_r, goal_c)
         while current in came_from:
             path.append(self.index_to_latlon(*current))
@@ -218,5 +307,6 @@ class DStarLite:
         path.reverse()
 
         if debug:
-            debug_msgs.append(f"Path length: {len(path)}")
+            debug_msgs.append(f"SUCCESS: Path found with {len(path)} waypoints")
+            debug_msgs.append(f"Hostile cells avoided: {skipped_hostile}")
         return path, debug_msgs

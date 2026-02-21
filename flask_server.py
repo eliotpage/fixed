@@ -255,6 +255,9 @@ def compute_path():
 
         # Filter hostile features (deleted ones ignored)
         hostile_features = [f for f in drawings if f['properties'].get('hostile') and not f['properties'].get('deleted')]
+        print(f"[Path] Computing path with {len(hostile_features)} hostile features out of {len(drawings)} total drawings")
+        for hf in hostile_features:
+            print(f"  - Hostile {hf['geometry']['type']}: ID={hf['properties']['_id']}, Color={hf['properties'].get('color')}")
 
         # Apply hostile zones to cost map: entire hostile shape blocked, influence slope around
         dstar.apply_hostile_zones(hostile_features, influence_radius_m=100)

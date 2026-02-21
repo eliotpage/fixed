@@ -246,7 +246,6 @@
             }).addTo(map);
 
             let editableLayers = new L.FeatureGroup().addTo(map);
-            let pathLayerGroup = new L.FeatureGroup().addTo(map);
             let drawings = [];
             let lastMarkerClick = null;
             let refreshPaused = false;
@@ -554,36 +553,96 @@
             function plotPath() {
                 const s = document.getElementById('start').value.split(',');
                 const g = document.getElementById('goal').value.split(',');
-                if (s.length !== 2 || g.length !== 2) return;
+                if (s.length !== 2 || g.length !== 2) {
+                    alert('Please enter valid start and goal coordinates (lat,lon format)');
+                    return;
+                }
                 const start_lon = parseFloat(s[0]), start_lat = parseFloat(s[1]);
                 const goal_lon = parseFloat(g[0]), goal_lat = parseFloat(g[1]);
                 const corridor = document.getElementById('corridorWidth').value;
+                
+                console.log('Computing path...');
+                console.log(`Start: ${start_lat}, ${start_lon}`);
+                console.log(`Goal: ${goal_lat}, ${goal_lon}`);
+                console.log(`Corridor: ${corridor}m`);
+                
                 fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
                     .then(r => r.json())
                     .then(res => {
-                        if (!res.path || !res.path.length) return;
-                        pathLayerGroup.clearLayers();
+                        // Log debug messages
+                        if (res.debug) {
+                            console.log('=== PATH COMPUTATION DEBUG ===');
+                            res.debug.forEach(msg => console.log(msg));
+                            console.log('==============================');
+                        }
+                        
+                        if (res.error) {
+                            console.error('Path computation error:', res.error);
+                            alert('No path found! ' + res.error + '\nCheck console for details.');
+                            return;
+                        }
+                        
+                        if (!res.path || !res.path.length) {
+                            console.error('Empty path returned');
+                            alert('No path found! The hostile zones may be blocking all possible routes.\nCheck console for details.');
+                            return;
+                        }
+                        
+                        console.log(`Path found with ${res.path.length} waypoints`);
+                        console.log(`Distance: ${res.distance_m}m, Estimated time: ${res.estimated_time_min} min`);
+                        
+                        // Remove old path if it exists
+                        const oldPathIdx = drawings.findIndex(f => f.properties._id === 'path');
+                        if (oldPathIdx >= 0) {
+                            drawings[oldPathIdx].properties.deleted = true;
+                            // Find and remove the old path layer
+                            editableLayers.eachLayer(layer => {
+                                if (layer._leaflet_id === 'path') {
+                                    editableLayers.removeLayer(layer);
+                                }
+                            });
+                        }
+                        
+                        // Create new path layer
                         const path = L.polyline(res.path.map(p => [p[0], p[1]]), { color: 'red' });
-                        pathLayerGroup.addLayer(path);
+                        path._leaflet_id = 'path';  // Set the ID
+                        path._hostile = false;
+                        
+                        // Add to editableLayers so it can be edited/deleted
+                        editableLayers.addLayer(path);
+                        
+                        // Bind popup to make it deletable
+                        bindShapePopup(path);
+                        
+                        // Save to drawings
                         const pathFeature = {
                             type: "Feature",
                             properties: { _id: 'path', color: 'red', hostile: false, deleted: false },
                             geometry: { type: "LineString", coordinates: res.path.map(p => [p[1], p[0]]) }
                         };
-                        const idx = drawings.findIndex(f => f.properties._id === 'path');
-                        if (idx >= 0) drawings[idx] = pathFeature;
-                        else drawings.push(pathFeature);
+                        drawings.push(pathFeature);
                         saveDrawings();
+                        console.log('Path plotted and saved');
                     })
-                    .catch(err => console.error(err));
+                    .catch(err => {
+                        console.error('Path computation failed:', err);
+                        alert('Path computation failed! Check console for details.');
+                    });
             }
 
             // ================== CLEAR PATH ==================
             function clearPath() {
-                pathLayerGroup.clearLayers();
+                // Find and remove path layer from editableLayers
+                editableLayers.eachLayer(layer => {
+                    if (layer._leaflet_id === 'path') {
+                        editableLayers.removeLayer(layer);
+                    }
+                });
+                // Mark as deleted in drawings
                 const idx = drawings.findIndex(f => f.properties._id === 'path');
                 if (idx >= 0) drawings[idx].properties.deleted = true;
                 saveDrawings();
+                console.log('Path cleared');
             }
 
             // ================== REFRESH TIMER (Persistent using epoch) ==================
