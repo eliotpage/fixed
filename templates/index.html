@@ -1,391 +1,644 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>POPMAP</title>
 
-<link rel="stylesheet" href="static/leaflet/leaflet.css"/>
-<link rel="stylesheet" href="static/leaflet-draw/dist/leaflet.draw.css"/>
+    <head>
+        <meta charset="UTF-8">
+        <title>POPMAP</title>
+        <link rel="stylesheet" href="static/leaflet/leaflet.css" />
+        <link rel="stylesheet" href="static/leaflet-draw/dist/leaflet.draw.css" />
+        <style>
+            html,
+            body {
+                height: 100%;
+                margin: 0;
+                font-family: "Segoe UI", sans-serif;
+                background: #f4f4f4;
+            }
 
-<style>
-html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; background:#f4f4f4; }
-#map { width:100%; height:calc(100% - 110px); }
+            #map {
+                width: 100%;
+                height: calc(100% - 130px);
+            }
 
-/* Header */
-#header-container {
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    position:relative;
-    padding:10px 20px;
-    background:#2c3e50;
-    color:white;
-}
-#merge-container {
-    position:absolute;
-    left:10px;
-    top:50%;
-    transform:translateY(-50%);
-    display:flex;
-    align-items:center;
-    gap:6px;
-}
-#merge-container button {
-    padding:4px 8px;
-    border:none;
-    border-radius:4px;
-    background:#2980b9;
-    color:white;
-    cursor:pointer;
-}
-#merge-container button:hover { background:#3498db; }
+            /* Header */
+            #header-container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                position: relative;
+                padding: 10px 20px;
+                background: #2c3e50;
+                color: white;
+            }
 
-#header-buttons { position:absolute; right:20px; top:50%; transform:translateY(-50%); }
-#header-buttons button { padding:6px 12px; border:none; border-radius:4px; background:#2980b9; color:white; cursor:pointer; }
-#header-buttons button:hover { background:#3498db; }
+            #merge-container {
+                position: absolute;
+                left: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
 
-/* Controls */
-#controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; padding:10px 20px; background:#f4f4f4; border-bottom:1px solid #111; }
-.input-with-button { position: relative; display:inline-block; }
-.input-with-button input { width:270px; height:32px; padding:6px 30px 6px 8px; font-size:14px; border-radius:4px; border:1px solid #ccc; box-sizing:border-box; }
-.input-with-button button { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:20px; height:20px; padding:0; border:none; background:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#2980b9; }
-.input-with-button button:hover { color:#3498db; }
-#controls button:not(.paste-btn){ padding:6px 12px; border-radius:4px; border:none; background:#2980b9; color:white; cursor:pointer; }
-#controls button:not(.paste-btn):hover{ background:#3498db; }
-.copy-btn{ background:none; border:none; cursor:pointer; padding:2px; display:inline-flex; align-items:center; justify-content:center; }
-.copy-btn svg{ width:18px; height:18px; stroke:#2980b9; stroke-width:2; fill:none; transition:0.2s; }
-.copy-btn:hover svg{ stroke:#3498db; }
-.paste-btn svg { width:16px; height:16px; fill:#2980b9; transition:0.2s; }
-.paste-btn:hover svg { fill:#3498db; }
-.toolbar-label{ position:absolute; z-index:1001; font-weight:bold; font-size:14px; padding:2px 6px; border-radius:4px; background:white; text-align:center; }
-.leaflet-popup-content svg { pointer-events:none; }
-.color-btn { border-radius:3px; cursor:pointer; }
-</style>
-</head>
-<body>
+            #merge-container button {
+                padding: 4px 8px;
+                border: none;
+                border-radius: 4px;
+                background: #2980b9;
+                color: white;
+                cursor: pointer;
+            }
 
-<div id="header-container">
-  <div>POPMAP</div>
-  <div id="merge-container">
-      <div id="merge-timer">Merge in: 10</div>
-      <button id="pause-btn">Pause</button>
-  </div>
-  <div id="header-buttons">
-    <button onclick="location.href='/logout'">Logout</button>
-  </div>
-</div>
+            #merge-container button:hover {
+                background: #3498db;
+            }
 
-<div id="controls">
-  <div class="input-with-button">
-    <input id="start" placeholder="Start lat,lon e.g. 35.189427,33.050308">
-    <button class="paste-btn" data-target="start" title="Paste">
-      <svg viewBox="0 0 24 24"><path d="M16 2H8C7.4477 2 7 2.4477 7 3V5H5C4.4477 5 4 5.4477 4 6V21C4 21.5523 4.4477 22 5 22H19C19.5523 22 20 21.5523 20 21V6C20 5.4477 19.5523 5 19 5H17V3C17 2.4477 16.5523 2 16 2ZM9 4H15V5H9V4ZM6 7H18V20H6V7Z"/></svg>
-    </button>
-  </div>
+            #header-buttons {
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+            }
 
-  <div class="input-with-button">
-    <input id="goal" placeholder="Goal lat,lon e.g. 35.216094,33.012543">
-    <button class="paste-btn" data-target="goal" title="Paste">
-      <svg viewBox="0 0 24 24"><path d="M16 2H8C7.4477 2 7 2.4477 7 3V5H5C4.4477 5 4 5.4477 4 6V21C4 21.5523 4.4477 22 5 22H19C19.5523 22 20 21.5523 20 21V6C20 5.4477 19.5523 5 19 5H17V3C17 2.4477 16.5523 2 16 2ZM9 4H15V5H9V4ZM6 7H18V20H6V7Z"/></svg>
-    </button>
-  </div>
+            #header-buttons button {
+                padding: 6px 12px;
+                border: none;
+                border-radius: 4px;
+                background: #2980b9;
+                color: white;
+                cursor: pointer;
+            }
 
-  <div style="display:flex;align-items:center;gap:5px;">
-    <label for="corridorWidth">Corridor width:</label>
-    <input type="range" id="corridorWidth" min="10" max="500" step="10" value="50">
-    <span id="corridorValue">50</span> m
-  </div>
+            #header-buttons button:hover {
+                background: #3498db;
+            }
 
-  <button onclick="plotPath()">Show Path</button>
-  <button onclick="clearPath()">Clear Path</button>
-</div>
+            /* Controls */
+            #controls {
+                display: flex;
+                justify-content: center;
+                gap: 10px;
+                flex-wrap: wrap;
+                padding: 10px 20px;
+                background: #f4f4f4;
+                border-bottom: 1px solid #111;
+            }
 
-<div id="map"></div>
+            .input-with-button {
+                position: relative;
+                display: inline-block;
+            }
 
-<script src="static/leaflet/leaflet.js"></script>
-<script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
+            .input-with-button input {
+                width: 270px;
+                height: 32px;
+                padding: 6px 30px 6px 8px;
+                font-size: 14px;
+                border-radius: 4px;
+                border: 1px solid #ccc;
+                box-sizing: border-box;
+            }
 
-<script>
-// ================== GLOBALS ==================
-let map = L.map('map',{center:[35.029294,33.050995],zoom:11,minZoom:11,maxZoom:16});
-L.tileLayer('static/tiles/{z}/{x}/{y}.png',{noWrap:true,minZoom:11,maxZoom:16}).addTo(map);
+            .input-with-button button {
+                position: absolute;
+                right: 4px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 20px;
+                height: 20px;
+                padding: 0;
+                border: none;
+                background: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                color: #2980b9;
+            }
 
-let editableLayers = new L.FeatureGroup().addTo(map);
-let pathLayerGroup = new L.FeatureGroup().addTo(map);
-let drawings = [];
-let lastMarkerClick = null;
-let refreshPaused = false;
-const POLL_INTERVAL_SEC = 10;
-const POLL_INTERVAL = POLL_INTERVAL_SEC*1000;
+            .input-with-button button:hover {
+                color: #3498db;
+            }
 
-// ================== COLORS ==================
-const COLORS = ['blue','red','green','orange','yellow','violet','grey','black'];
-let currentColor = 'blue';
-let markerIcons = {};
-COLORS.forEach(c=>{
-    markerIcons[c] = new L.Icon({
-        iconUrl:`static/leaflet/images/marker-icon-${c}.png`,
-        shadowUrl:'static/leaflet/images/marker-shadow.png',
-        iconSize:[25,41],iconAnchor:[12,41],popupAnchor:[1,-34],shadowSize:[41,41]
-    });
-});
+            #controls button:not(.paste-btn) {
+                padding: 6px 12px;
+                border-radius: 4px;
+                border: none;
+                background: #2980b9;
+                color: white;
+                cursor: pointer;
+            }
 
-// ================== COLOR SELECTOR ==================
-L.Control.ColorToggle = L.Control.extend({
-    onAdd: function(map){
-        const container = L.DomUtil.create('div','leaflet-bar leaflet-control leaflet-control-custom');
-        container.style.background='white';
-        container.style.padding='4px';
-        container.style.borderRadius='4px';
-        container.style.display='flex';
-        container.style.flexDirection='column';
-        container.style.gap='2px';
-        container.title='Select draw color';
-        container.style.position='absolute';
-        container.style.top='4px';
-        container.style.left='0px';
-        COLORS.forEach(c=>{
-            const btn = L.DomUtil.create('div','color-btn',container);
-            btn.style.width='18px';
-            btn.style.height='18px';
-            btn.style.background=c;
-            btn.style.border = c===currentColor?'2px solid black':'1px solid #ccc';
-            btn.addEventListener('click',()=>{
-                currentColor=c;
-                container.querySelectorAll('.color-btn').forEach(el=>el.style.border='1px solid #ccc');
-                btn.style.border='2px solid black';
-            });
-        });
-        return container;
-    },
-    onRemove: function(){}
-});
-const colorControl = new L.Control.ColorToggle({position:'topleft'});
-colorControl.addTo(map);
-const colorContainer = colorControl.getContainer();
-colorContainer.style.marginTop='80px';
-colorContainer.style.marginLeft='50px';
+            #controls button:not(.paste-btn):hover {
+                background: #3498db;
+            }
 
-// ================== DRAW CONTROL ==================
-let drawControl = new L.Control.Draw({
-    position:'topleft',
-    draw:{
-        polygon:{shapeOptions:{color:currentColor}},
-        polyline:{shapeOptions:{color:currentColor}},
-        rectangle:{shapeOptions:{color:currentColor}},
-        circle:{shapeOptions:{color:currentColor}},
-        marker:{icon:markerIcons[currentColor]},
-        circlemarker:{color:currentColor,fillColor:currentColor,fillOpacity:1}
-    },
-    edit:{featureGroup:editableLayers, remove:true}
-});
-map.addControl(drawControl);
+            .copy-btn {
+                background: none;
+                border: none;
+                cursor: pointer;
+                padding: 2px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
 
-// ================== HELPERS ==================
-function layerToFeature(layer,color){
-    if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
-    let f={type:"Feature",properties:{_id:layer._leaflet_id,deleted:false,color,hostile:layer._hostile||false},geometry:{}};
-    if(layer instanceof L.Marker||layer instanceof L.Circle||layer instanceof L.CircleMarker){
-        const ll=layer.getLatLng();
-        f.geometry={type:"Point",coordinates:[ll.lng,ll.lat]};
-        if(layer instanceof L.Circle) f.properties.radius=layer.getRadius();
-        else if(layer instanceof L.CircleMarker) f.properties.isCircleMarker=true;
-        else if(layer instanceof L.Marker) f.properties.isMarker=true;
-    } else if(layer instanceof L.Polygon) f.geometry={type:"Polygon",coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])]};
-    else if(layer instanceof L.Polyline) f.geometry={type:"LineString",coordinates:layer.getLatLngs().map(c=>[c.lng,c.lat])};
-    return f;
-}
+            .copy-btn svg {
+                width: 18px;
+                height: 18px;
+                stroke: #2980b9;
+                stroke-width: 2;
+                fill: none;
+                transition: 0.2s;
+            }
 
-function featureToLayer(f){
-    let layer=null; const c=f.properties.color||'blue'; const g=f.geometry;
-    if(g.type==="Polygon") layer=L.polygon(g.coordinates[0].map(p=>[p[1],p[0]]),{color:c,fillColor:c,fillOpacity:0.5});
-    if(g.type==="LineString") layer=L.polyline(g.coordinates.map(p=>[p[1],p[0]]),{color:c});
-    if(g.type==="Point"){
-        if(f.properties.radius) layer=L.circle([g.coordinates[1],g.coordinates[0]],{radius:f.properties.radius,color:c});
-        else if(f.properties.isCircleMarker) layer=L.circleMarker([g.coordinates[1],g.coordinates[0]],{color:c,fillColor:c,fillOpacity:1});
-        else if(f.properties.isMarker) layer=L.marker([g.coordinates[1],g.coordinates[0]],{icon:markerIcons[c]});
-    }
-    if(layer) {layer._leaflet_id=f.properties._id; layer._hostile=f.properties.hostile||false;}
-    return layer;
-}
+            .copy-btn:hover svg {
+                stroke: #3498db;
+            }
 
-// ================== POPUP ==================
-function bindPopup(layer){
-    if(layer instanceof L.Marker){
-        const ll=layer.getLatLng();
-        layer.bindPopup(`<div style="display:flex;flex-direction:column;gap:6px">
-            <div style="display:flex;align-items:center;gap:6px;">
-                <span class="popup-label">${ll.lng.toFixed(6)},${ll.lat.toFixed(6)}</span>
-                <button class="copy-btn" title="Copy">
-                    <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><rect x="3" y="3" width="13" height="13" rx="2"></rect></svg>
+            .paste-btn svg {
+                width: 16px;
+                height: 16px;
+                fill: #2980b9;
+                transition: 0.2s;
+            }
+
+            .paste-btn:hover svg {
+                fill: #3498db;
+            }
+
+            .toolbar-label {
+                position: absolute;
+                z-index: 1001;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background: white;
+                text-align: center;
+            }
+
+            .leaflet-popup-content svg {
+                pointer-events: none;
+            }
+
+            .color-btn {
+                border-radius: 3px;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="header-container">
+            <div>POPMAP</div>
+            <div id="merge-container">
+                <div id="merge-timer">Merge in: 10</div>
+                <button id="pause-btn">Pause</button>
+            </div>
+            <div id="header-buttons">
+                <button onclick="location.href='/logout'">Logout</button>
+            </div>
+        </div>
+
+        <div id="controls">
+            <div class="input-with-button">
+                <input id="start" placeholder="Start lat,lon e.g. 35.189427,33.050308">
+                <button class="paste-btn" data-target="start" title="Paste">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M16 2H8C7.4477 2 7 2.4477 7 3V5H5C4.4477 5 4 5.4477 4 6V21C4 21.5523 4.4477 22 5 22H19C19.5523 22 20 21.5523 20 21V6C20 5.4477 19.5523 5 19 5H17V3C17 2.4477 16.5523 2 16 2ZM9 4H15V5H9V4ZM6 7H18V20H6V7Z" />
+                    </svg>
                 </button>
             </div>
-            <label><input type="checkbox" class="hostile-toggle"/> Hostile</label>
-        </div>`);
-        layer.on('popupopen',()=>{ 
-            const cb = layer.getPopup().getElement().querySelector('.hostile-toggle');
-            cb.checked = layer._hostile || false;
-            cb.addEventListener('change',()=>{
-                layer._hostile=cb.checked;
-                const f = drawings.find(f=>f.properties._id===layer._leaflet_id);
-                if(f) f.properties.hostile=layer._hostile;
+            <div class="input-with-button">
+                <input id="goal" placeholder="Goal lat,lon e.g. 35.216094,33.012543">
+                <button class="paste-btn" data-target="goal" title="Paste">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M16 2H8C7.4477 2 7 2.4477 7 3V5H5C4.4477 5 4 5.4477 4 6V21C4 21.5523 4.4477 22 5 22H19C19.5523 22 20 21.5523 20 21V6C20 5.4477 19.5523 5 19 5H17V3C17 2.4477 16.5523 2 16 2ZM9 4H15V5H9V4ZM6 7H18V20H6V7Z" />
+                    </svg>
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <label for="corridorWidth">Corridor width:</label>
+                <input type="range" id="corridorWidth" min="10" max="500" step="10" value="50">
+                <span id="corridorValue">50</span> m
+            </div>
+            <button onclick="plotPath()">Show Path</button>
+        </div>
+
+        <div id="map"></div>
+
+        <script src="static/leaflet/leaflet.js"></script>
+        <script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
+        <script>
+            // ================== GLOBALS ==================
+            let map = L.map('map', {
+                center: [35.029294, 33.050995],
+                zoom: 11,
+                minZoom: 11,
+                maxZoom: 16
+            });
+            L.tileLayer('static/tiles/{z}/{x}/{y}.png', {
+                noWrap: true,
+                minZoom: 11,
+                maxZoom: 16
+            }).addTo(map);
+
+            let editableLayers = new L.FeatureGroup().addTo(map);
+            let pathLayerGroup = new L.FeatureGroup().addTo(map);
+            let drawings = [];
+            let lastMarkerClick = null;
+            let refreshPaused = false;
+            const POLL_INTERVAL_SEC = 10;
+            const POLL_INTERVAL = POLL_INTERVAL_SEC * 1000;
+
+            // ================== COLORS ==================
+            const COLORS = ['blue', 'red', 'green', 'orange', 'yellow', 'violet', 'grey', 'black'];
+            let currentColor = 'blue';
+            let markerIcons = {};
+            COLORS.forEach(c => {
+                markerIcons[c] = new L.Icon({
+                    iconUrl: `static/leaflet/images/marker-icon-${c}.png`,
+                    shadowUrl: 'static/leaflet/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                });
+            });
+
+            // ================== COLOR SELECTOR ==================
+            L.Control.ColorToggle = L.Control.extend({
+                onAdd: function (map) {
+                    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+                    container.style.background = 'white';
+                    container.style.padding = '4px';
+                    container.style.borderRadius = '4px';
+                    container.style.display = 'flex';
+                    container.style.flexDirection = 'column';
+                    container.style.gap = '2px';
+                    container.title = 'Select draw color';
+                    container.style.position = 'absolute';
+                    container.style.top = '4px';
+                    container.style.left = '0px';
+                    COLORS.forEach(c => {
+                        const btn = L.DomUtil.create('div', 'color-btn', container);
+                        btn.style.width = '18px';
+                        btn.style.height = '18px';
+                        btn.style.background = c;
+                        btn.style.border = c === currentColor ? '2px solid black' : '1px solid #ccc';
+                        btn.addEventListener('click', () => {
+                            currentColor = c;
+                            container.querySelectorAll('.color-btn').forEach(el => el.style.border = '1px solid #ccc');
+                            btn.style.border = '2px solid black';
+                        });
+                    });
+                    return container;
+                },
+                onRemove: function () { }
+            });
+
+            const colorControl = new L.Control.ColorToggle({ position: 'topleft' });
+            colorControl.addTo(map);
+            const colorContainer = colorControl.getContainer();
+            colorContainer.style.marginTop = '80px';
+            colorContainer.style.marginLeft = '50px';
+
+            // ================== DRAW CONTROL ==================
+            let drawControl = new L.Control.Draw({
+                position: 'topleft',
+                draw: {
+                    polygon: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false  // Stop after drawing one shape
+                    },
+                    polyline: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false 
+                    },
+                    rectangle: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false 
+                    },
+                    circle: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false 
+                    },
+                    marker: { 
+                        icon: markerIcons[currentColor],
+                        repeatMode: false 
+                    },
+                    circlemarker: { 
+                        color: currentColor, 
+                        fillColor: currentColor, 
+                        fillOpacity: 1,
+                        repeatMode: false 
+                    }
+                },
+                edit: { 
+                    featureGroup: editableLayers, 
+                    remove: true 
+                }
+            });
+            map.addControl(drawControl);
+
+            // ================== HELPERS ==================
+            function layerToFeature(layer, color) {
+                if (!layer._leaflet_id) layer._leaflet_id = L.stamp(layer);
+                let f = { type: "Feature", properties: { _id: layer._leaflet_id, deleted: false, color, hostile: layer._hostile || false }, geometry: {} };
+                if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.CircleMarker) {
+                    const ll = layer.getLatLng();
+                    f.geometry = { type: "Point", coordinates: [ll.lng, ll.lat] };
+                    if (layer instanceof L.Circle) f.properties.radius = layer.getRadius();
+                    else if (layer instanceof L.CircleMarker) f.properties.isCircleMarker = true;
+                    else if (layer instanceof L.Marker) f.properties.isMarker = true;
+                } else if (layer instanceof L.Polygon) f.geometry = { type: "Polygon", coordinates: [layer.getLatLngs()[0].map(c => [c.lng, c.lat])] };
+                else if (layer instanceof L.Polyline) f.geometry = { type: "LineString", coordinates: layer.getLatLngs().map(c => [c.lng, c.lat]) };
+                return f;
+            }
+
+            function featureToLayer(f) {
+                let layer = null;
+                const c = f.properties.color || 'blue';
+                const g = f.geometry;
+                if (g.type === "Polygon") layer = L.polygon(g.coordinates[0].map(p => [p[1], p[0]]), { color: c, fillColor: c, fillOpacity: 0.5 });
+                if (g.type === "LineString") layer = L.polyline(g.coordinates.map(p => [p[1], p[0]]), { color: c });
+                if (g.type === "Point") {
+                    if (f.properties.radius) layer = L.circle([g.coordinates[1], g.coordinates[0]], { radius: f.properties.radius, color: c });
+                    else if (f.properties.isCircleMarker) layer = L.circleMarker([g.coordinates[1], g.coordinates[0]], { color: c, fillColor: c, fillOpacity: 1 });
+                    else if (f.properties.isMarker) layer = L.marker([g.coordinates[1], g.coordinates[0]], { icon: markerIcons[c] });
+                }
+                if (layer) {
+                    layer._leaflet_id = f.properties._id;
+                    layer._hostile = f.properties.hostile || false;
+                }
+                return layer;
+            }
+
+            // ================== POPUPS ==================
+            function bindMarkerPopup(layer) {
+                const ll = layer.getLatLng();
+                layer.bindPopup(`
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="popup-label">${ll.lng.toFixed(6)},${ll.lat.toFixed(6)}</span>
+                            <button class="copy-btn" title="Copy">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                    <rect x="3" y="3" width="13" height="13" rx="2"></rect>
+                                </svg>
+                            </button>
+                        </div>
+                        <label><input type="checkbox" class="hostile-toggle"/> Hostile</label>
+                    </div>
+                `);
+                layer.on('popupopen', () => {
+                    const cb = layer.getPopup().getElement().querySelector('.hostile-toggle');
+                    cb.checked = layer._hostile || false;
+                    cb.addEventListener('change', () => {
+                        layer._hostile = cb.checked;
+                        const f = drawings.find(f => f.properties._id === layer._leaflet_id);
+                        if (f) f.properties.hostile = layer._hostile;
+                        saveDrawings();
+                    });
+                });
+                layer.on('click', () => {
+                    lastMarkerClick = layer;
+                });
+            }
+
+            function bindShapePopup(layer) {
+                layer.bindPopup(`
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                        <label><input type="checkbox" class="hostile-toggle"/> Hostile</label>
+                    </div>
+                `);
+                layer.on('popupopen', () => {
+                    const cb = layer.getPopup().getElement().querySelector('.hostile-toggle');
+                    cb.checked = layer._hostile || false;
+                    cb.addEventListener('change', () => {
+                        layer._hostile = cb.checked;
+                        const f = drawings.find(f => f.properties._id === layer._leaflet_id);
+                        if (f) f.properties.hostile = layer._hostile;
+                        saveDrawings();
+                    });
+                });
+            }
+
+            // ================== SAVE/LOAD ==================
+            function saveDrawings() {
+                console.log('Saving', drawings.length, 'drawings...');
+                fetch('/save_drawings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(drawings),
+                    keepalive: true  // Ensures request completes even if page is closing
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Drawings saved successfully");
+                })
+                .catch(err => console.error("Error saving drawings:", err));
+            }
+
+            function safeLoadDrawings() {
+                console.log('Loading drawings from server...');
+                fetch('/merge_drawings')
+                    .then(r => r.json())
+                    .then(data => {
+                        drawings = Array.isArray(data.merged) ? data.merged : (Array.isArray(data) ? data : []);
+                        editableLayers.clearLayers();
+                        let loadedCount = 0;
+                        drawings.forEach(f => {
+                            if (f.properties.deleted) return;
+                            const l = featureToLayer(f);
+                            if (l) {
+                                editableLayers.addLayer(l);
+                                // Bind popups which automatically makes layers clickable
+                                if (f.properties.isMarker) bindMarkerPopup(l);
+                                else bindShapePopup(l);
+                                loadedCount++;
+                            }
+                        });
+                        console.log(`Loaded ${loadedCount} active drawings (${drawings.length} total including deleted)`);
+                    })
+                    .catch(err => console.error("Error loading drawings:", err));
+            }
+
+            // ================== DRAW EVENTS ==================
+            map.on(L.Draw.Event.CREATED, function (e) {
+                const layer = e.layer;
+                layer._hostile = false;
+                
+                // Apply color styling
+                if (layer instanceof L.Circle || layer instanceof L.CircleMarker || layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Rectangle)
+                    layer.setStyle({ color: currentColor, fillColor: currentColor });
+                if (layer instanceof L.Marker) layer.setIcon(markerIcons[currentColor]);
+
+                // Add to map and save
+                editableLayers.addLayer(layer);
+                const feature = layerToFeature(layer, currentColor);
+                drawings.push(feature);
+
+                // Bind popup
+                if (layer instanceof L.Marker) bindMarkerPopup(layer);
+                else bindShapePopup(layer);
+
+                // Save immediately
+                saveDrawings();
+                console.log('Created and saved:', feature.properties._id);
+            });
+
+            map.on(L.Draw.Event.EDITED, function (e) {
+                e.layers.eachLayer(l => {
+                    const idx = drawings.findIndex(f => f.properties._id === l._leaflet_id);
+                    if (idx >= 0) {
+                        drawings[idx] = layerToFeature(l, drawings[idx].properties.color);
+                        console.log('Edited layer:', l._leaflet_id);
+                    }
+                });
                 saveDrawings();
             });
-        });
-        layer.on('click',()=>{lastMarkerClick=layer;});
-    }
-}
 
-// ================== SAVE/LOAD ==================
-function saveDrawings(){ fetch('/save_drawings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(drawings)});}
-function safeLoadDrawings(){
-    fetch('/merge_drawings').then(r=>r.json()).then(data=>{
-        drawings = Array.isArray(data.merged)? data.merged : data;
-        editableLayers.clearLayers();
-        drawings.forEach(f=>{
-            if(f.properties.deleted) return;
-            const l=featureToLayer(f);
-            if(l){editableLayers.addLayer(l); if(f.properties.isMarker) bindPopup(l);}
-        });
-    });
-}
+            map.on(L.Draw.Event.DELETED, function (e) {
+                e.layers.eachLayer(l => {
+                    const f = drawings.find(f => f.properties._id === l._leaflet_id);
+                    if (f) {
+                        f.properties.deleted = true;
+                        console.log('Deleted layer:', l._leaflet_id);
+                    }
+                });
+                saveDrawings();
+            });
 
-// ================== DRAW EVENTS ==================
-map.on(L.Draw.Event.CREATED,function(e){
-    const layer=e.layer;
-    if(layer instanceof L.Circle||layer instanceof L.CircleMarker||layer instanceof L.Polygon||layer instanceof L.Polyline||layer instanceof L.Rectangle)
-        layer.setStyle({color:currentColor,fillColor:currentColor});
-    if(layer instanceof L.Marker) layer.setIcon(markerIcons[currentColor]);
-    layer._hostile=false;
-    editableLayers.addLayer(layer);
-    drawings.push(layerToFeature(layer,currentColor));
-    if(layer instanceof L.Marker) bindPopup(layer);
-    saveDrawings();
-});
+            // ================== COPY/PASTE ==================
+            map.on('click', e => map.lastClick = e.latlng);
 
-map.on(L.Draw.Event.EDITED, function(e){
-    e.layers.eachLayer(l=>{
-        const idx = drawings.findIndex(f => f.properties._id === l._leaflet_id);
-        if(idx >= 0) drawings[idx] = layerToFeature(l, drawings[idx].properties.color);
-    });
-    saveDrawings();
+            document.querySelectorAll('.paste-btn').forEach(btn => btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                let ll = lastMarkerClick ? lastMarkerClick.getLatLng() : map.lastClick || map.getCenter();
+                input.value = ll.lng.toFixed(6) + ',' + ll.lat.toFixed(6);
+            }));
 
-    // Exit edit mode
-    if(drawControl._toolbars.edit._modes.edit.handler.enabled()){
-        drawControl._toolbars.edit._modes.edit.handler.disable();
-    }
-});
+            document.addEventListener('click', e => {
+                const btn = e.target.closest('.copy-btn');
+                if (!btn) return;
+                const popup = btn.closest('.leaflet-popup-content');
+                if (!popup) return;
+                const labelEl = popup.querySelector('.popup-label');
+                if (!labelEl) return;
+                const text = labelEl.textContent.trim();
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text);
+                } else {
+                    const ta = document.createElement("textarea");
+                    ta.value = text;
+                    ta.style.position = "fixed";
+                    ta.style.left = "-9999px";
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                }
+            });
 
+            // ================== CORRIDOR SLIDER ==================
+            document.getElementById('corridorWidth').addEventListener('input', function () {
+                document.getElementById('corridorValue').textContent = this.value;
+            });
 
-map.on(L.Draw.Event.DELETED, function(e){
-    e.layers.eachLayer(l=>{
-        const f = drawings.find(f => f.properties._id === l._leaflet_id);
-        if(f) f.properties.deleted = true;
-    });
-    saveDrawings();
+            // ================== PATH PLOTTING ==================
+            function plotPath() {
+                const s = document.getElementById('start').value.split(',');
+                const g = document.getElementById('goal').value.split(',');
+                if (s.length !== 2 || g.length !== 2) return;
+                const start_lon = parseFloat(s[0]), start_lat = parseFloat(s[1]);
+                const goal_lon = parseFloat(g[0]), goal_lat = parseFloat(g[1]);
+                const corridor = document.getElementById('corridorWidth').value;
+                fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!res.path || !res.path.length) return;
+                        pathLayerGroup.clearLayers();
+                        const path = L.polyline(res.path.map(p => [p[0], p[1]]), { color: 'red' });
+                        pathLayerGroup.addLayer(path);
+                        const pathFeature = {
+                            type: "Feature",
+                            properties: { _id: 'path', color: 'red', hostile: false, deleted: false },
+                            geometry: { type: "LineString", coordinates: res.path.map(p => [p[1], p[0]]) }
+                        };
+                        const idx = drawings.findIndex(f => f.properties._id === 'path');
+                        if (idx >= 0) drawings[idx] = pathFeature;
+                        else drawings.push(pathFeature);
+                        saveDrawings();
+                    })
+                    .catch(err => console.error(err));
+            }
 
-    // Exit delete mode
-    if(drawControl._toolbars.edit._modes.remove.handler.enabled()){
-        drawControl._toolbars.edit._modes.remove.handler.disable();
-    }
-});
+            // ================== CLEAR PATH ==================
+            function clearPath() {
+                pathLayerGroup.clearLayers();
+                const idx = drawings.findIndex(f => f.properties._id === 'path');
+                if (idx >= 0) drawings[idx].properties.deleted = true;
+                saveDrawings();
+            }
 
+            // ================== REFRESH TIMER (Persistent using epoch) ==================
+            const TIMER_KEY = 'nextMergeEpoch';
+            let nextMergeEpoch = parseFloat(localStorage.getItem(TIMER_KEY)) || (Date.now() / 1000 + POLL_INTERVAL_SEC);
 
-// ================== COPY/PASTE ==================
-map.on('click',e=>map.lastClick=e.latlng);
-document.querySelectorAll('.paste-btn').forEach(btn=>btn.addEventListener('click',()=>{
-    const targetId=btn.getAttribute('data-target');
-    const input=document.getElementById(targetId);
-    let ll=lastMarkerClick?lastMarkerClick.getLatLng():map.lastClick||map.getCenter();
-    input.value=ll.lng.toFixed(6)+','+ll.lat.toFixed(6);
-}));
-document.addEventListener('click',e=>{
-    const btn=e.target.closest('.copy-btn'); if(!btn) return;
-    const popup=btn.closest('.leaflet-popup-content'); if(!popup) return;
-    const labelEl=popup.querySelector('.popup-label'); if(!labelEl) return;
-    const text=labelEl.textContent.trim();
-    if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(text);
-    else{const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);}
-});
+            function updateTimer() {
+                if (refreshPaused) return;
+                const now = Date.now() / 1000;
+                let remaining = Math.round(nextMergeEpoch - now);
+                if (remaining <= 0) {
+                    console.log('Timer hit 0, reloading drawings from server...');
+                    safeLoadDrawings();
+                    nextMergeEpoch = now + POLL_INTERVAL_SEC;
+                    localStorage.setItem(TIMER_KEY, nextMergeEpoch);
+                    remaining = POLL_INTERVAL_SEC;
+                }
+                document.getElementById('merge-timer').textContent = `Merge in: ${remaining}`;
+            }
 
-// ================== CORRIDOR SLIDER ==================
-document.getElementById('corridorWidth').addEventListener('input',function(){document.getElementById('corridorValue').textContent=this.value;});
+            updateTimer();
+            setInterval(updateTimer, 1000);
 
-// ================== PATH PLOTTING ==================
-function plotPath(){
-    const s=document.getElementById('start').value.split(',');
-    const g=document.getElementById('goal').value.split(',');
-    if(s.length!==2||g.length!==2) return;
-    const start_lon=parseFloat(s[0]),start_lat=parseFloat(s[1]);
-    const goal_lon=parseFloat(g[0]),goal_lat=parseFloat(g[1]);
-    const corridor=document.getElementById('corridorWidth').value;
-    fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
-        .then(r=>r.json()).then(res=>{
-            if(!res.path||!res.path.length) return;
-            pathLayerGroup.clearLayers();
-            const path=L.polyline(res.path.map(p=>[p[0],p[1]]),{color:'red'});
-            pathLayerGroup.addLayer(path);
-            // Save path as feature
-            const pathFeature={type:"Feature",properties:{_id:'path',color:'red',hostile:false,deleted:false},geometry:{type:"LineString",coordinates:res.path.map(p=>[p[1],p[0]])}};
-            const idx = drawings.findIndex(f=>f.properties._id==='path');
-            if(idx>=0) drawings[idx]=pathFeature; else drawings.push(pathFeature);
-            saveDrawings();
-        })
-        .catch(err=>console.error(err));
-}
+            document.getElementById('pause-btn').addEventListener('click', () => {
+                refreshPaused = !refreshPaused;
+                document.getElementById('pause-btn').textContent = refreshPaused ? 'Resume' : 'Pause';
+                if (!refreshPaused) {
+                    const currentRemaining = parseInt(document.getElementById('merge-timer').textContent.split(': ')[1]) || POLL_INTERVAL_SEC;
+                    nextMergeEpoch = Date.now() / 1000 + currentRemaining;
+                    localStorage.setItem(TIMER_KEY, nextMergeEpoch);
+                    updateTimer();
+                }
+            });
 
-// ================== CLEAR PATH ==================
-function clearPath(){
-    pathLayerGroup.clearLayers();
-    const idx = drawings.findIndex(f=>f.properties._id==='path');
-    if(idx>=0) drawings[idx].properties.deleted=true;
-    saveDrawings();
-}
+            // ================== SAVE BEFORE UNLOAD ==================
+            window.addEventListener('beforeunload', function(e) {
+                // Use sendBeacon for reliable save on page unload
+                console.log('Page closing, saving with sendBeacon...');
+                const blob = new Blob([JSON.stringify(drawings)], {type: 'application/json'});
+                navigator.sendBeacon('/save_drawings', blob);
+            });
 
-// ================== REFRESH TIMER (Persistent using epoch) ==================
-const TIMER_KEY = 'nextMergeEpoch';
-let nextMergeEpoch = parseFloat(localStorage.getItem(TIMER_KEY)) || (Date.now()/1000 + POLL_INTERVAL_SEC);
+            // Auto-save periodically as backup (every 10 seconds)
+            setInterval(function() {
+                if (drawings.length > 0) {
+                    console.log('Auto-save triggered');
+                    saveDrawings();
+                }
+            }, 10000);
 
-function updateTimer(){
-    if(refreshPaused) return;
+            // ================== INITIAL LOAD ==================
+            console.log('Initializing map...');
+            safeLoadDrawings();
+        </script>
+    </body>
 
-    const now = Date.now()/1000;
-    let remaining = Math.round(nextMergeEpoch - now);
-
-    if(remaining <= 0){
-        safeLoadDrawings();
-        nextMergeEpoch = now + POLL_INTERVAL_SEC;  // reset next merge
-        localStorage.setItem(TIMER_KEY, nextMergeEpoch);
-        remaining = POLL_INTERVAL_SEC;
-    }
-
-    document.getElementById('merge-timer').textContent = `Merge in: ${remaining}`;
-}
-
-// Call immediately so it shows the correct remaining time on load
-updateTimer();
-
-// Then run every second
-setInterval(updateTimer, 1000);
-
-// Pause / Resume button
-document.getElementById('pause-btn').addEventListener('click', ()=>{
-    refreshPaused = !refreshPaused;
-    document.getElementById('pause-btn').textContent = refreshPaused ? 'Resume' : 'Pause';
-
-    if(!refreshPaused){
-        const currentRemaining = parseInt(document.getElementById('merge-timer').textContent.split(': ')[1]) || POLL_INTERVAL_SEC;
-        nextMergeEpoch = Date.now()/1000 + currentRemaining;
-        localStorage.setItem(TIMER_KEY, nextMergeEpoch);
-        updateTimer(); // also update immediately when resuming
-    }
-});
-
-
-// ================== INITIAL LOAD ==================
-safeLoadDrawings();
-</script>
-
-
-</body>
 </html>
+                

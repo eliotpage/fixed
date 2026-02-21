@@ -1,8 +1,10 @@
-json 
-serial 
-time 
-flask 
-os 
-math 
-requests
+flask
+flask-mail
+python-dotenv
+rasterio
+pyproj
 shapely
+pillow
+scipy
+numpy
+requests
