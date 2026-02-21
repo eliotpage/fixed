@@ -1,0 +1,70 @@
+[
+  {
+    "type": "Feature",
+    "properties": {
+      "_id": 2,
+      "deleted": true,
+      "color": "red"
+    },
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          33.101,
+          35.101
+        ],
+        [
+          33.102,
+          35.102
+        ]
+      ]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "_id": 3,
+      "deleted": true,
+      "color": "green"
+    },
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            33.103,
+            35.103
+          ],
+          [
+            33.104,
+            35.104
+          ],
+          [
+            33.105,
+            35.103
+          ],
+          [
+            33.103,
+            35.103
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "_id": 4,
+      "deleted": false,
+      "color": "orange",
+      "isMarker": true
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        33.106,
+        35.106
+      ]
+    }
+  }
+]

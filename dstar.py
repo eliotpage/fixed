@@ -110,21 +110,20 @@ class DStarLite:
             debug_msgs.append(f"Start indices: {start_r},{start_c}")
             debug_msgs.append(f"Goal indices: {goal_r},{goal_c}")
 
-        # Corridor bounds
-        if corridor_m:
-            meters_per_pixel = np.mean(self.dem.res) * 111000
-            corridor_cells = int(corridor_m / meters_per_pixel)
-            min_r = max(0, min(start_r, goal_r) - corridor_cells)
-            max_r = min(self.rows-1, max(start_r, goal_r) + corridor_cells)
-            min_c = max(0, min(start_c, goal_c) - corridor_cells)
-            max_c = min(self.cols-1, max(start_c, goal_c) + corridor_cells)
-            corridor = (min_r, max_r, min_c, max_c)
-            if debug:
-                debug_msgs.append(f"Corridor bounds: {corridor}")
-        else:
-            corridor = None
+        # ===================== Corridor in cells =====================
+        meters_per_pixel = np.mean(self.dem.res) * 111000  # approx meters per pixel
+        corridor_cells = int(corridor_m / meters_per_pixel) if corridor_m else 0
 
-        # A* search
+        # Define bounding box to limit search (optional for speed)
+        min_r = max(0, min(start_r, goal_r) - corridor_cells)
+        max_r = min(self.rows-1, max(start_r, goal_r) + corridor_cells)
+        min_c = max(0, min(start_c, goal_c) - corridor_cells)
+        max_c = min(self.cols-1, max(start_c, goal_c) + corridor_cells)
+
+        if debug:
+            debug_msgs.append(f"Corridor bounds (inflated by {corridor_m} m): {(min_r,max_r,min_c,max_c)}")
+
+        # ===================== A* search =====================
         frontier = []
         heapq.heappush(frontier, (0, (start_r, start_c)))
         came_from = {(start_r, start_c): None}
@@ -137,16 +136,25 @@ class DStarLite:
             if (r, c) == (goal_r, goal_c):
                 if debug: debug_msgs.append(f"Goal reached in {steps} steps")
                 break
-            for nr, nc in self.neighbors(r, c, corridor):
-                new_cost = cost_so_far[(r, c)] + self.cost(r, c, nr, nc)
-                if (nr, nc) not in cost_so_far or new_cost < cost_so_far[(nr, nc)]:
-                    cost_so_far[(nr, nc)] = new_cost
-                    heapq.heappush(frontier, (new_cost + self.heuristic(nr, nc, goal_r, goal_c), (nr, nc)))
-                    came_from[(nr, nc)] = (r, c)
+
+            # Expanded neighbors based on corridor_cells
+            for dr in range(-1-corridor_cells, 2+corridor_cells):
+                for dc in range(-1-corridor_cells, 2+corridor_cells):
+                    if dr==0 and dc==0: continue
+                    nr, nc = r+dr, c+dc
+                    if nr < min_r or nr > max_r or nc < min_c or nc > max_c: continue
+                    if not self.in_bounds(nr, nc): continue
+
+                    new_cost = cost_so_far[(r, c)] + self.cost(r, c, nr, nc)
+                    if (nr, nc) not in cost_so_far or new_cost < cost_so_far[(nr, nc)]:
+                        cost_so_far[(nr, nc)] = new_cost
+                        heapq.heappush(frontier, (new_cost + self.heuristic(nr, nc, goal_r, goal_c), (nr, nc)))
+                        came_from[(nr, nc)] = (r, c)
+
             if debug and steps % 1000 == 0:
                 debug_msgs.append(f"Step {steps}, frontier size {len(frontier)}")
 
-        # Reconstruct path
+        # ===================== Reconstruct path =====================
         path = []
         current = (goal_r, goal_c)
         while current in came_from:

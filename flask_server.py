@@ -7,6 +7,105 @@ from hashing import generate_otp, verify_otp
 from dstar import DStarLite
 from dotenv import load_dotenv
 import numpy as np
+import threading
+import time
+
+# ===================== DEMO DATA =====================
+DEMO_DRAWINGS = [
+    {
+        "type": "Feature",
+        "properties": {"_id": 1, "deleted": False, "color": "blue", "isMarker": True},
+        "geometry": {"type": "Point", "coordinates": [33.100, 35.100]}
+    },
+    {
+        "type": "Feature",
+        "properties": {"_id": 2, "deleted": True, "color": "red"},
+        "geometry": {"type": "LineString", "coordinates": [[33.101, 35.101], [33.102, 35.102]]}
+    },
+    {
+        "type": "Feature",
+        "properties": {"_id": 3, "deleted": False, "color": "green"},
+        "geometry": {"type": "Polygon", "coordinates": [[[33.103, 35.103], [33.104, 35.104], [33.105, 35.103], [33.103, 35.103]]]}
+    }
+]
+
+DEMO_SHARED = [
+    {
+        "type": "Feature",
+        "properties": {"_id": 2, "deleted": True, "color": "red"},
+        "geometry": {"type": "LineString", "coordinates": [[33.101, 35.101], [33.102, 35.102]]}
+    },
+    {
+        "type": "Feature",
+        "properties": {"_id": 3, "deleted": True, "color": "green"},
+        "geometry": {"type": "Polygon", "coordinates": [[[33.103, 35.103], [33.104, 35.104], [33.105, 35.103], [33.103, 35.103]]]}
+    },
+    {
+        "type": "Feature",
+        "properties": {"_id": 4, "deleted": False, "color": "orange", "isMarker": True},
+        "geometry": {"type": "Point", "coordinates": [33.106, 35.106]}
+    }
+]
+
+MERGE_DIR = '/workspaces/fixed'  # directory to watch for shared.json
+MERGE_INTERVAL = 10    # seconds between checks
+
+def merge_drawings():
+    while True:
+        shared_path = os.path.join(MERGE_DIR, 'shared.json')
+        if os.path.exists(shared_path):
+            try:
+                with open(DRAWINGS_FILE, 'r') as f:
+                    drawings = json.load(f)
+                with open(shared_path, 'r') as f:
+                    shared = json.load(f)
+
+                # Build dicts keyed by _id
+                def build_dict(features):
+                    return {f['properties']['_id']: f for f in features}
+                
+                drawings_dict = build_dict(drawings)
+                shared_dict = build_dict(shared)
+                merged_dict = {}
+                all_ids = set(drawings_dict.keys()) | set(shared_dict.keys())
+
+                for _id in all_ids:
+                    d_feat = drawings_dict.get(_id)
+                    s_feat = shared_dict.get(_id)
+                    
+                    # Both deleted → skip
+                    if d_feat and s_feat and d_feat['properties'].get('deleted') and s_feat['properties'].get('deleted'):
+                        continue
+                    # Only in one file → keep
+                    if d_feat and not s_feat:
+                        merged_dict[_id] = d_feat
+                        continue
+                    if s_feat and not d_feat:
+                        merged_dict[_id] = s_feat
+                        continue
+                    # In both → handle deletion
+                    merged = d_feat.copy()
+                    merged_props = merged['properties'].copy()
+                    if d_feat['properties'].get('deleted') or s_feat['properties'].get('deleted'):
+                        merged_props['deleted'] = True
+                    merged['properties'] = merged_props
+                    merged_dict[_id] = merged
+
+                merged_list = list(merged_dict.values())
+                
+                # Overwrite drawings.json with merged
+                with open(DRAWINGS_FILE, 'w') as f:
+                    json.dump(merged_list, f, indent=2)
+
+                print(f"[Merge] Merged {len(drawings)} + {len(shared)} → {len(merged_list)} features")
+
+            except Exception as e:
+                print(f"[Merge] Error merging drawings: {e}")
+
+        time.sleep(MERGE_INTERVAL)
+
+merge_thread = threading.Thread(target=merge_drawings, daemon=True)
+merge_thread.start()
 
 # ===================== APP SETUP =====================
 app = Flask(__name__)
@@ -177,6 +276,25 @@ def tile_bounds():
         'maxZoom': 16
     })
 
-# ===================== RUN SERVER =====================
 if __name__ == "__main__":
+    os.makedirs('static', exist_ok=True)
+
+    # Initialize drawings.json if missing
+    if not os.path.exists(DRAWINGS_FILE):
+        with open(DRAWINGS_FILE, 'w') as f:
+            json.dump(DEMO_DRAWINGS, f, indent=2)
+        print("[Init] Created demo drawings.json")
+
+    # Initialize shared.json if missing
+    shared_file = os.path.join('static', 'shared.json')
+    if not os.path.exists(shared_file):
+        with open(shared_file, 'w') as f:
+            json.dump(DEMO_SHARED, f, indent=2)
+        print("[Init] Created demo shared.json")
+
+    # Start merge thread (will run periodically after first interval)
+    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+        merge_thread = threading.Thread(target=merge_drawings, daemon=True)
+        merge_thread.start()
+
     app.run(debug=True)
