@@ -4,7 +4,8 @@
     "properties": {
       "_id": 2,
       "deleted": true,
-      "color": "red"
+      "color": "red",
+      "hostile": false
     },
     "geometry": {
       "type": "LineString",
@@ -25,7 +26,8 @@
     "properties": {
       "_id": 3,
       "deleted": true,
-      "color": "green"
+      "color": "green",
+      "hostile": false
     },
     "geometry": {
       "type": "Polygon",
@@ -57,7 +59,8 @@
       "_id": 4,
       "deleted": false,
       "color": "orange",
-      "isMarker": true
+      "isMarker": true,
+      "hostile": false
     },
     "geometry": {
       "type": "Point",

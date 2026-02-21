@@ -10,28 +10,41 @@
 <style>
 html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; background:#f4f4f4; }
 #map { width:100%; height:calc(100% - 110px); }
+
+/* Header */
 #header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 20px;
-    background: #2c3e50;
-    color: white;
-    position: relative;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+    padding:10px 20px;
+    background:#2c3e50;
+    color:white;
 }
+#merge-container {
+    position:absolute;
+    left:10px;
+    top:50%;
+    transform:translateY(-50%);
+    display:flex;
+    align-items:center;
+    gap:6px;
+}
+#merge-container button {
+    padding:4px 8px;
+    border:none;
+    border-radius:4px;
+    background:#2980b9;
+    color:white;
+    cursor:pointer;
+}
+#merge-container button:hover { background:#3498db; }
 
-#header-container div#refresh-countdown {
-    min-width: 80px; /* ensure space so it doesn’t overlap POPMAP */
-}
-
-#header-container > div:nth-child(2) {
-    flex: 1;
-    text-align: center;
-    font-weight: bold;
-    font-size: 18px;
-}
+#header-buttons { position:absolute; right:20px; top:50%; transform:translateY(-50%); }
 #header-buttons button { padding:6px 12px; border:none; border-radius:4px; background:#2980b9; color:white; cursor:pointer; }
 #header-buttons button:hover { background:#3498db; }
+
+/* Controls */
 #controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; padding:10px 20px; background:#f4f4f4; border-bottom:1px solid #111; }
 .input-with-button { position: relative; display:inline-block; }
 .input-with-button input { width:270px; height:32px; padding:6px 30px 6px 8px; font-size:14px; border-radius:4px; border:1px solid #ccc; box-sizing:border-box; }
@@ -52,17 +65,11 @@ html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; backgroun
 <body>
 
 <div id="header-container">
-  <!-- Countdown goes on the left -->
-  <div id="refresh-countdown" style="font-size:12px;color:#fff;">
-    Refresh in <span id="countdown">10</span>s
+  <div>POPMAP</div>
+  <div id="merge-container">
+      <div id="merge-timer">Merge in: 10</div>
+      <button id="pause-btn">Pause</button>
   </div>
-
-  <!-- POPMAP centered -->
-  <div style="flex:1;text-align:center;font-weight:bold;font-size:18px;">
-    POPMAP
-  </div>
-
-  <!-- Logout button on the right -->
   <div id="header-buttons">
     <button onclick="location.href='/logout'">Logout</button>
   </div>
@@ -90,10 +97,7 @@ html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; backgroun
   </div>
 
   <button onclick="plotPath()">Show Path</button>
-
-  <div id="refresh-countdown" style="font-size:12px;color:#555;margin-left:10px;">
-  Refresh in <span id="countdown">10</span>s
-    </div>
+  <button onclick="clearPath()">Clear Path</button>
 </div>
 
 <div id="map"></div>
@@ -102,70 +106,67 @@ html, body { height:100%; margin:0; font-family:"Segoe UI",sans-serif; backgroun
 <script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
 
 <script>
-// ===== MAP & GROUPS =====
-let map = L.map('map',{center:[35.029294,33.050995],zoom:11,minZoom:10,maxZoom:16});
-L.tileLayer('static/tiles/{z}/{x}/{y}.png',{noWrap:true,minZoom:10,maxZoom:16}).addTo(map);
+// ================== GLOBALS ==================
+let map = L.map('map',{center:[35.029294,33.050995],zoom:11,minZoom:11,maxZoom:16});
+L.tileLayer('static/tiles/{z}/{x}/{y}.png',{noWrap:true,minZoom:11,maxZoom:16}).addTo(map);
 
 let editableLayers = new L.FeatureGroup().addTo(map);
-let drawings = [];
 let pathLayerGroup = new L.FeatureGroup().addTo(map);
+let drawings = [];
 let lastMarkerClick = null;
+let refreshPaused = false;
+const POLL_INTERVAL_SEC = 10;
+const POLL_INTERVAL = POLL_INTERVAL_SEC*1000;
 
-// ===== COLORS & MARKERS =====
+// ================== COLORS ==================
 const COLORS = ['blue','red','green','orange','yellow','violet','grey','black'];
 let currentColor = 'blue';
 let markerIcons = {};
 COLORS.forEach(c=>{
     markerIcons[c] = new L.Icon({
-        iconUrl: `static/leaflet/images/marker-icon-${c}.png`,
-        shadowUrl: 'static/leaflet/images/marker-shadow.png',
+        iconUrl:`static/leaflet/images/marker-icon-${c}.png`,
+        shadowUrl:'static/leaflet/images/marker-shadow.png',
         iconSize:[25,41],iconAnchor:[12,41],popupAnchor:[1,-34],shadowSize:[41,41]
     });
 });
 
-// ===== COLOR TOGGLE CONTROL (VERTICAL NEXT TO SHAPE TOOLBAR) =====
+// ================== COLOR SELECTOR ==================
 L.Control.ColorToggle = L.Control.extend({
     onAdd: function(map){
         const container = L.DomUtil.create('div','leaflet-bar leaflet-control leaflet-control-custom');
-        container.style.background = 'white';
-        container.style.padding = '4px';
-        container.style.borderRadius = '4px';
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.gap = '2px';
-        container.title = 'Select draw color';
-        container.style.position = 'absolute';   // absolute positioning
-        container.style.top = '4px';            // align with toolbar top
-        container.style.left = '0px';           // move right of toolbar
-
-        COLORS.forEach(c => {
+        container.style.background='white';
+        container.style.padding='4px';
+        container.style.borderRadius='4px';
+        container.style.display='flex';
+        container.style.flexDirection='column';
+        container.style.gap='2px';
+        container.title='Select draw color';
+        container.style.position='absolute';
+        container.style.top='4px';
+        container.style.left='0px';
+        COLORS.forEach(c=>{
             const btn = L.DomUtil.create('div','color-btn',container);
-            btn.style.width = '18px';
-            btn.style.height = '18px';
-            btn.style.background = c;
-            btn.style.border = c === currentColor ? '2px solid black' : '1px solid #ccc';
-            btn.style.cursor = 'pointer';
-
-            btn.addEventListener('click', () => {
-                currentColor = c;
-                container.querySelectorAll('.color-btn').forEach(el => el.style.border = '1px solid #ccc');
-                btn.style.border = '2px solid black';
+            btn.style.width='18px';
+            btn.style.height='18px';
+            btn.style.background=c;
+            btn.style.border = c===currentColor?'2px solid black':'1px solid #ccc';
+            btn.addEventListener('click',()=>{
+                currentColor=c;
+                container.querySelectorAll('.color-btn').forEach(el=>el.style.border='1px solid #ccc');
+                btn.style.border='2px solid black';
             });
         });
-
         return container;
     },
-    onRemove: function(map){}
+    onRemove: function(){}
 });
-
 const colorControl = new L.Control.ColorToggle({position:'topleft'});
 colorControl.addTo(map);
-
 const colorContainer = colorControl.getContainer();
-colorContainer.style.marginTop = '80px'; // align with toolbar
-colorContainer.style.marginLeft = '50px'; // move next to toolbar
+colorContainer.style.marginTop='80px';
+colorContainer.style.marginLeft='50px';
 
-// ===== DRAW CONTROL =====
+// ================== DRAW CONTROL ==================
 let drawControl = new L.Control.Draw({
     position:'topleft',
     draw:{
@@ -174,59 +175,23 @@ let drawControl = new L.Control.Draw({
         rectangle:{shapeOptions:{color:currentColor}},
         circle:{shapeOptions:{color:currentColor}},
         marker:{icon:markerIcons[currentColor]},
-        circlemarker:{color:currentColor, fillColor:currentColor, fillOpacity:1}
+        circlemarker:{color:currentColor,fillColor:currentColor,fillOpacity:1}
     },
     edit:{featureGroup:editableLayers, remove:true}
 });
 map.addControl(drawControl);
 
-// ===== DRAWINGS AUTO-REFRESH =====
-const POLL_INTERVAL = 10;  // seconds
-let countdown = POLL_INTERVAL;
-const countdownEl = document.getElementById('countdown');
-
-function updateCountdown() {
-    countdown--;
-    if(countdown <= 0) countdown = POLL_INTERVAL;
-    countdownEl.textContent = countdown;
-}
-
-setInterval(updateCountdown, 1000); // update countdown every second
-
-function loadDrawings() {
-    fetch('/static/drawings.json')
-        .then(r => r.json())
-        .then(data => {
-            editableLayers.clearLayers();
-            data.forEach(f => {
-                if(f.properties?.deleted) return;
-                const layer = featureToLayer(f);
-                if(layer){
-                    editableLayers.addLayer(layer);
-                    if(f.properties.isMarker) bindPopup(layer);
-                }
-            });
-        });
-}
-
-// Reload drawings every POLL_INTERVAL seconds
-setInterval(loadDrawings, POLL_INTERVAL * 1000);
-
-// ===== HELPERS =====
-function saveDrawings(){
-    fetch('/save_drawings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(drawings)});
-}
-
+// ================== HELPERS ==================
 function layerToFeature(layer,color){
     if(!layer._leaflet_id) layer._leaflet_id=L.stamp(layer);
-    let f={type:"Feature",properties:{_id:layer._leaflet_id,deleted:false,color},geometry:{}};
+    let f={type:"Feature",properties:{_id:layer._leaflet_id,deleted:false,color,hostile:layer._hostile||false},geometry:{}};
     if(layer instanceof L.Marker||layer instanceof L.Circle||layer instanceof L.CircleMarker){
         const ll=layer.getLatLng();
         f.geometry={type:"Point",coordinates:[ll.lng,ll.lat]};
         if(layer instanceof L.Circle) f.properties.radius=layer.getRadius();
         else if(layer instanceof L.CircleMarker) f.properties.isCircleMarker=true;
         else if(layer instanceof L.Marker) f.properties.isMarker=true;
-    }else if(layer instanceof L.Polygon) f.geometry={type:"Polygon",coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])]};
+    } else if(layer instanceof L.Polygon) f.geometry={type:"Polygon",coordinates:[layer.getLatLngs()[0].map(c=>[c.lng,c.lat])]};
     else if(layer instanceof L.Polyline) f.geometry={type:"LineString",coordinates:layer.getLatLngs().map(c=>[c.lng,c.lat])};
     return f;
 }
@@ -240,57 +205,93 @@ function featureToLayer(f){
         else if(f.properties.isCircleMarker) layer=L.circleMarker([g.coordinates[1],g.coordinates[0]],{color:c,fillColor:c,fillOpacity:1});
         else if(f.properties.isMarker) layer=L.marker([g.coordinates[1],g.coordinates[0]],{icon:markerIcons[c]});
     }
-    if(layer) layer._leaflet_id=f.properties._id||layer._leaflet_id;
+    if(layer) {layer._leaflet_id=f.properties._id; layer._hostile=f.properties.hostile||false;}
     return layer;
 }
 
+// ================== POPUP ==================
 function bindPopup(layer){
     if(layer instanceof L.Marker){
         const ll=layer.getLatLng();
-        layer.bindPopup(`<div style="display:flex;align-items:center;gap:6px;">
-            <span class="popup-label">${ll.lng.toFixed(6)},${ll.lat.toFixed(6)}</span>
-            <button class="copy-btn" title="Copy">
-            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><rect x="3" y="3" width="13" height="13" rx="2"></rect></svg>
-            </button>
+        layer.bindPopup(`<div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span class="popup-label">${ll.lng.toFixed(6)},${ll.lat.toFixed(6)}</span>
+                <button class="copy-btn" title="Copy">
+                    <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><rect x="3" y="3" width="13" height="13" rx="2"></rect></svg>
+                </button>
+            </div>
+            <label><input type="checkbox" class="hostile-toggle"/> Hostile</label>
         </div>`);
+        layer.on('popupopen',()=>{ 
+            const cb = layer.getPopup().getElement().querySelector('.hostile-toggle');
+            cb.checked = layer._hostile || false;
+            cb.addEventListener('change',()=>{
+                layer._hostile=cb.checked;
+                const f = drawings.find(f=>f.properties._id===layer._leaflet_id);
+                if(f) f.properties.hostile=layer._hostile;
+                saveDrawings();
+            });
+        });
         layer.on('click',()=>{lastMarkerClick=layer;});
     }
 }
 
-// ===== LOAD EXISTING =====
-fetch('/static/drawings.json').then(r=>r.json()).then(data=>{
-    drawings=data||[];
-    drawings.forEach(f=>{
-        if(f.properties?.deleted)return;
-        const l=featureToLayer(f);
-        if(l){ editableLayers.addLayer(l); if(f.properties.isMarker) bindPopup(l);}
+// ================== SAVE/LOAD ==================
+function saveDrawings(){ fetch('/save_drawings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(drawings)});}
+function safeLoadDrawings(){
+    fetch('/merge_drawings').then(r=>r.json()).then(data=>{
+        drawings = Array.isArray(data.merged)? data.merged : data;
+        editableLayers.clearLayers();
+        drawings.forEach(f=>{
+            if(f.properties.deleted) return;
+            const l=featureToLayer(f);
+            if(l){editableLayers.addLayer(l); if(f.properties.isMarker) bindPopup(l);}
+        });
     });
-});
+}
 
-// ===== DRAW EVENTS =====
+// ================== DRAW EVENTS ==================
 map.on(L.Draw.Event.CREATED,function(e){
-    const layer=e.layer; 
-    if(layer instanceof L.Circle||layer instanceof L.CircleMarker||layer instanceof L.Polygon||layer instanceof L.Polyline||layer instanceof L.Rectangle){
+    const layer=e.layer;
+    if(layer instanceof L.Circle||layer instanceof L.CircleMarker||layer instanceof L.Polygon||layer instanceof L.Polyline||layer instanceof L.Rectangle)
         layer.setStyle({color:currentColor,fillColor:currentColor});
-    }
     if(layer instanceof L.Marker) layer.setIcon(markerIcons[currentColor]);
+    layer._hostile=false;
     editableLayers.addLayer(layer);
     drawings.push(layerToFeature(layer,currentColor));
     if(layer instanceof L.Marker) bindPopup(layer);
     saveDrawings();
 });
 
-map.on(L.Draw.Event.EDITED,function(e){e.layers.eachLayer(l=>{
-    const idx=drawings.findIndex(f=>f.properties._id===l._leaflet_id);
-    if(idx>=0) drawings[idx]=layerToFeature(l,drawings[idx].properties.color);
-});saveDrawings();});
+map.on(L.Draw.Event.EDITED, function(e){
+    e.layers.eachLayer(l=>{
+        const idx = drawings.findIndex(f => f.properties._id === l._leaflet_id);
+        if(idx >= 0) drawings[idx] = layerToFeature(l, drawings[idx].properties.color);
+    });
+    saveDrawings();
 
-map.on(L.Draw.Event.DELETED,function(e){e.layers.eachLayer(l=>{
-    const f=drawings.find(f=>f.properties._id===l._leaflet_id);
-    if(f) f.properties.deleted=true;
-});saveDrawings();});
+    // Exit edit mode
+    if(drawControl._toolbars.edit._modes.edit.handler.enabled()){
+        drawControl._toolbars.edit._modes.edit.handler.disable();
+    }
+});
 
-// ===== PASTE & COPY =====
+
+map.on(L.Draw.Event.DELETED, function(e){
+    e.layers.eachLayer(l=>{
+        const f = drawings.find(f => f.properties._id === l._leaflet_id);
+        if(f) f.properties.deleted = true;
+    });
+    saveDrawings();
+
+    // Exit delete mode
+    if(drawControl._toolbars.edit._modes.remove.handler.enabled()){
+        drawControl._toolbars.edit._modes.remove.handler.disable();
+    }
+});
+
+
+// ================== COPY/PASTE ==================
 map.on('click',e=>map.lastClick=e.latlng);
 document.querySelectorAll('.paste-btn').forEach(btn=>btn.addEventListener('click',()=>{
     const targetId=btn.getAttribute('data-target');
@@ -298,36 +299,93 @@ document.querySelectorAll('.paste-btn').forEach(btn=>btn.addEventListener('click
     let ll=lastMarkerClick?lastMarkerClick.getLatLng():map.lastClick||map.getCenter();
     input.value=ll.lng.toFixed(6)+','+ll.lat.toFixed(6);
 }));
-
 document.addEventListener('click',e=>{
-    const btn=e.target.closest('.copy-btn'); if(!btn)return;
-    const popup=btn.closest('.leaflet-popup-content'); if(!popup)return;
-    const labelEl=popup.querySelector('.popup-label'); if(!labelEl)return;
+    const btn=e.target.closest('.copy-btn'); if(!btn) return;
+    const popup=btn.closest('.leaflet-popup-content'); if(!popup) return;
+    const labelEl=popup.querySelector('.popup-label'); if(!labelEl) return;
     const text=labelEl.textContent.trim();
-    if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text);}
-    else{const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";
-    document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);}
+    if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(text);
+    else{const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);}
 });
 
-// ===== CORRIDOR SLIDER =====
-document.getElementById('corridorWidth').addEventListener('input',function(){
-    document.getElementById('corridorValue').textContent=this.value;
-});
+// ================== CORRIDOR SLIDER ==================
+document.getElementById('corridorWidth').addEventListener('input',function(){document.getElementById('corridorValue').textContent=this.value;});
 
-// ===== PATH PLOTTING =====
+// ================== PATH PLOTTING ==================
 function plotPath(){
     const s=document.getElementById('start').value.split(',');
     const g=document.getElementById('goal').value.split(',');
     if(s.length!==2||g.length!==2) return;
-    const start_lon=parseFloat(s[0]), start_lat=parseFloat(s[1]);
-    const goal_lon=parseFloat(g[0]), goal_lat=parseFloat(g[1]);
+    const start_lon=parseFloat(s[0]),start_lat=parseFloat(s[1]);
+    const goal_lon=parseFloat(g[0]),goal_lat=parseFloat(g[1]);
     const corridor=document.getElementById('corridorWidth').value;
     fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
-        .then(r=>r.json()).then(res=>{if(!res.path||!res.path.length)return;
-        pathLayerGroup.clearLayers(); const path=L.polyline(res.path.map(p=>[p[0],p[1]]),{color:'red'}).addTo(pathLayerGroup);
-        map.fitBounds(path.getBounds());
-    });
+        .then(r=>r.json()).then(res=>{
+            if(!res.path||!res.path.length) return;
+            pathLayerGroup.clearLayers();
+            const path=L.polyline(res.path.map(p=>[p[0],p[1]]),{color:'red'});
+            pathLayerGroup.addLayer(path);
+            // Save path as feature
+            const pathFeature={type:"Feature",properties:{_id:'path',color:'red',hostile:false,deleted:false},geometry:{type:"LineString",coordinates:res.path.map(p=>[p[1],p[0]])}};
+            const idx = drawings.findIndex(f=>f.properties._id==='path');
+            if(idx>=0) drawings[idx]=pathFeature; else drawings.push(pathFeature);
+            saveDrawings();
+        })
+        .catch(err=>console.error(err));
 }
+
+// ================== CLEAR PATH ==================
+function clearPath(){
+    pathLayerGroup.clearLayers();
+    const idx = drawings.findIndex(f=>f.properties._id==='path');
+    if(idx>=0) drawings[idx].properties.deleted=true;
+    saveDrawings();
+}
+
+// ================== REFRESH TIMER (Persistent using epoch) ==================
+const TIMER_KEY = 'nextMergeEpoch';
+let nextMergeEpoch = parseFloat(localStorage.getItem(TIMER_KEY)) || (Date.now()/1000 + POLL_INTERVAL_SEC);
+
+function updateTimer(){
+    if(refreshPaused) return;
+
+    const now = Date.now()/1000;
+    let remaining = Math.round(nextMergeEpoch - now);
+
+    if(remaining <= 0){
+        safeLoadDrawings();
+        nextMergeEpoch = now + POLL_INTERVAL_SEC;  // reset next merge
+        localStorage.setItem(TIMER_KEY, nextMergeEpoch);
+        remaining = POLL_INTERVAL_SEC;
+    }
+
+    document.getElementById('merge-timer').textContent = `Merge in: ${remaining}`;
+}
+
+// Call immediately so it shows the correct remaining time on load
+updateTimer();
+
+// Then run every second
+setInterval(updateTimer, 1000);
+
+// Pause / Resume button
+document.getElementById('pause-btn').addEventListener('click', ()=>{
+    refreshPaused = !refreshPaused;
+    document.getElementById('pause-btn').textContent = refreshPaused ? 'Resume' : 'Pause';
+
+    if(!refreshPaused){
+        const currentRemaining = parseInt(document.getElementById('merge-timer').textContent.split(': ')[1]) || POLL_INTERVAL_SEC;
+        nextMergeEpoch = Date.now()/1000 + currentRemaining;
+        localStorage.setItem(TIMER_KEY, nextMergeEpoch);
+        updateTimer(); // also update immediately when resuming
+    }
+});
+
+
+// ================== INITIAL LOAD ==================
+safeLoadDrawings();
 </script>
+
+
 </body>
 </html>
