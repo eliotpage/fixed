@@ -29,8 +29,8 @@ DEMO_SHARED = [
      "geometry": {"type": "Point", "coordinates": [33.106, 35.106]}}
 ]
 
-DRAWINGS_FILE = os.path.join('static', 'drawings.json')
-SHARED_FILE = os.path.join('static', 'shared.json')
+DRAWINGS_FILE = os.path.join('data', 'drawings.json')
+SHARED_FILE = os.path.join('data', 'shared.json')
 TILE_DIR = os.path.join('static', 'tiles')
 DEM_PATH = os.path.join('static', 'output_be.tif')
 MERGE_INTERVAL = 10  # seconds

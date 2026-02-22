@@ -8,9 +8,13 @@ __pycache__/
 *.egg
 venv/
 .venv/
+*.py[cod]
+*$py.class
 
 # Flask / environment
 .env
+.env.local
+.env.*.local
 instance/
 
 # Tile cache (VERY IMPORTANT)
@@ -19,10 +23,21 @@ tiles/
 static/tiles.zip
 *.mbtiles
 
+# DEM files (large)
+*.tar.gz
+rasters_*.tar.gz
+
+# Encrypted data backups
+*.enc
+drawings_decrypted.json
+drawings_test*.json
+merged_drawings.json
+
 # App cache / temp
 config/cache/
 cache/
 tmp/
+test_output.json
 
 # Drawings backups (optional)
 *.bak
@@ -30,9 +45,27 @@ tmp/
 # OS junk
 .DS_Store
 Thumbs.db
+.Spotlight-V100
+.Trashes
 
 # VS Code
 .vscode/
+*.code-workspace
 
 # Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
