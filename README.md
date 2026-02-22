@@ -69,7 +69,7 @@ MAIL_PASSWORD=your-app-password
 python flask_server.py
 ```
 
-6. Access at: `http://localhost:5000`
+6. Access at: `http://localhost:80`
 
 ## Project Structure
 

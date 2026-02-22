@@ -5,8 +5,8 @@ import threading
 import time
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_mail import Mail, Message
-from hashing import generate_otp, verify_otp
-from dstar import DStarLite
+from lib.hashing import generate_otp, verify_otp
+from lib.dstar import DStarLite
 from dotenv import load_dotenv
 import numpy as np
 

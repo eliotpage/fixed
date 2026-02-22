@@ -231,6 +231,7 @@
                 <button id="pause-btn">Pause</button>
             </div>
             <div id="header-buttons">
+                <button onclick="initializeDemoDrawings()">Initialize</button>
                 <button onclick="location.href='/logout'">Logout</button>
             </div>
         </div>
@@ -265,7 +266,6 @@
         <script src="static/leaflet/leaflet.js"></script>
         <script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
         <script>
-
             // ================== IN-PAGE ALERT ==================
             function showAlert(msg, type='error', duration=5000) {
                 const alertDiv = document.getElementById('site-alert');
@@ -369,42 +369,45 @@
 
             // ================== DRAW CONTROL ==================
             let drawControl = new L.Control.Draw({
-            position: 'topleft',
-            draw: {
-                polygon: {
-                    shapeOptions: { color: currentColor },
-                    repeatMode: false
+                position: 'topleft',
+                draw: {
+                    polygon: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false  // Stop after drawing one shape
+                    },
+                    polyline: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false 
+                    },
+                    rectangle: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false 
+                    },
+                    circle: { 
+                        shapeOptions: { color: currentColor },
+                        repeatMode: false 
+                    },
+                    marker: { 
+                        icon: markerIcons[currentColor],
+                        repeatMode: false 
+                    },
+                    circlemarker: { 
+                        color: currentColor, 
+                        fillColor: currentColor, 
+                        fillOpacity: 1,
+                        repeatMode: false 
+                    }
                 },
-                polyline: {
-                    shapeOptions: { color: currentColor },
-                    repeatMode: false
-                },
-                rectangle: {
-                    shapeOptions: { color: currentColor },
-                    repeatMode: false
-                },
-                circle: {
-                    shapeOptions: { color: currentColor },
-                    repeatMode: false
-                },
-                marker: {
-                    icon: markerIcons[currentColor],
-                    repeatMode: false
-                },
-                circlemarker: {
-                    color: currentColor, 
-                    fillColor: currentColor, 
-                    fillOpacity: 1,
-                    repeatMode: false
+                edit: {
+                    featureGroup: editableLayers,
+                    remove: true,
+                    edit: false  // Disable edit, keep only delete
                 }
-            },
-            edit: { 
-                featureGroup: editableLayers, 
-                remove: true 
-            }
-        });
+            });
+            map.addControl(drawControl);
 
-        map.addControl(drawControl);
+            // Store reference to draw control for later use
+            window.mapDrawControl = drawControl;
 
             // ================== HELPERS ==================
             function layerToFeature(layer, color) {
@@ -491,13 +494,11 @@
 
             // ================== SAVE/LOAD ==================
             function saveDrawings() {
-                console.log('Saving drawings...');
-                const drawingsToSave = drawings.filter(f => !f.properties.deleted); // Only save non-deleted shapes
-
+                console.log('Saving', drawings.length, 'drawings...');
                 fetch('/save_drawings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(drawingsToSave),
+                    body: JSON.stringify(drawings),
                     keepalive: true  // Ensures request completes even if page is closing
                 })
                 .then(response => response.json())
@@ -513,22 +514,53 @@
                     .then(r => r.json())
                     .then(data => {
                         drawings = Array.isArray(data.merged) ? data.merged : (Array.isArray(data) ? data : []);
+                        editableLayers.clearLayers();
                         let loadedCount = 0;
                         drawings.forEach(f => {
-                            if (f.properties.deleted) return; // Skip deleted shapes
-                            
+                            if (f.properties.deleted) return;
                             const l = featureToLayer(f);
                             if (l) {
                                 editableLayers.addLayer(l);
-                                // Bind popups to layers that need them
+                                // Bind popups which automatically makes layers clickable
                                 if (f.properties.isMarker) bindMarkerPopup(l);
                                 else bindShapePopup(l);
                                 loadedCount++;
                             }
                         });
-                        console.log(`Loaded ${loadedCount} active drawings.`);
+                        console.log(`Loaded ${loadedCount} active drawings (${drawings.length} total including deleted)`);
                     })
                     .catch(err => console.error("Error loading drawings:", err));
+            }
+
+            // Initialize with demo drawings
+            function initializeDemoDrawings() {
+                const demoDrawings = [
+                    {"type": "Feature", "properties": {"_id": 1, "deleted": false, "color": "blue", "isMarker": true, "hostile": false},
+                     "geometry": {"type": "Point", "coordinates": [33.100, 35.100]}},
+                    {"type": "Feature", "properties": {"_id": 3, "deleted": false, "color": "green", "hostile": false},
+                     "geometry": {"type": "Polygon", "coordinates": [[[33.103, 35.103], [33.104, 35.104], [33.105, 35.103], [33.103, 35.103]]]}},
+                    {"type": "Feature", "properties": {"_id": 4, "deleted": false, "color": "orange", "isMarker": true, "hostile": false},
+                     "geometry": {"type": "Point", "coordinates": [33.106, 35.106]}}
+                ];
+                
+                drawings = demoDrawings;
+                editableLayers.clearLayers();
+                
+                let loadedCount = 0;
+                drawings.forEach(f => {
+                    if (f.properties.deleted) return;
+                    const l = featureToLayer(f);
+                    if (l) {
+                        editableLayers.addLayer(l);
+                        if (f.properties.isMarker) bindMarkerPopup(l);
+                        else bindShapePopup(l);
+                        loadedCount++;
+                    }
+                });
+                
+                saveDrawings();
+                showAlert(`✓ Loaded ${loadedCount} demo drawings`, 'success', 3000);
+                console.log('Demo drawings initialized');
             }
 
             // ================== DRAW EVENTS ==================
@@ -555,37 +587,12 @@
                 console.log('Created and saved:', feature.properties._id);
             });
 
-            map.on(L.Draw.Event.EDITED, function (e) {
-                e.layers.eachLayer(layer => {
-                    if (layer._leaflet_id) {
-                        // Update drawing in the array
-                        const idx = drawings.findIndex(f => f.properties._id === layer._leaflet_id);
-                        if (idx >= 0) {
-                            const updated = layerToFeature(layer, drawings[idx].properties.color);
-
-                            // Only update geometry + keep properties
-                            drawings[idx].geometry = updated.geometry;
-                            console.log('Edited layer:', layer._leaflet_id);
-                        }
-                        
-                        // Rebind the popup to the updated layer
-                        if (layer instanceof L.Marker) {
-                            bindMarkerPopup(layer);
-                        } else {
-                            bindShapePopup(layer);
-                        }
-                    }
-                });
-                saveDrawings();
-            });
-
             map.on(L.Draw.Event.DELETED, function (e) {
-                e.layers.eachLayer(layer => {
-                    const idx = drawings.findIndex(f => f.properties._id === layer._leaflet_id);
-                    if (idx >= 0) {
-                        // Mark layers as deleted, but don't actually remove unless necessary
-                        drawings[idx].properties.deleted = true;
-                        console.log('Deleted layer:', layer._leaflet_id);
+                e.layers.eachLayer(l => {
+                    const f = drawings.find(f => f.properties._id === l._leaflet_id);
+                    if (f) {
+                        f.properties.deleted = true;
+                        console.log('Deleted layer:', l._leaflet_id);
                     }
                 });
                 saveDrawings();
@@ -597,16 +604,23 @@
             });
 
             map.on(L.Draw.Event.DRAWSTOP, function (e) {
+                // Clean up any leftover UI elements
+                const toolbar = document.querySelector('.leaflet-draw-actions');
+                if (toolbar) toolbar.style.display = 'none';
+                map.getContainer().style.cursor = '';
                 console.log('Draw mode stopped');
             });
 
-            // Edit mode handlers
-            map.on(L.Draw.Event.EDITSTART, function (e) {
-                console.log('Edit mode started');
-            });
-
+            // Delete mode handlers
             map.on(L.Draw.Event.DELETESTART, function (e) {
                 console.log('Delete mode started');
+            });
+
+            map.on(L.Draw.Event.DELETESTOP, function (e) {
+                const toolbar = document.querySelector('.leaflet-draw-actions');
+                if (toolbar) toolbar.style.display = 'none';
+                map.getContainer().style.cursor = '';
+                console.log('Delete mode stopped');
             });
 
             // ================== COPY/PASTE ==================
