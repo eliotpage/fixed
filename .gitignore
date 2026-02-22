@@ -17,8 +17,10 @@ venv/
 .env.*.local
 instance/
 
-# Tile cache (VERY IMPORTANT)
-static/tiles/
+# Tile cache (exclude tile files but keep directory structure)
+static/tiles/**/*.png
+static/tiles/**/*.jpg
+static/tiles/**/*.tif
 tiles/
 static/tiles.zip
 *.mbtiles
