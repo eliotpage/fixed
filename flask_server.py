@@ -285,7 +285,18 @@ def compute_path():
             total_dist += R * c
 
         est_time_min = round(total_dist / 1.4 / 60, 1)
-        return jsonify(path=path, debug=debug_msgs, distance_m=round(total_dist), estimated_time_min=est_time_min)
+        
+        # Calculate path risk based on proximity to hostile zones
+        risk_level, min_distance = dstar.calculate_path_risk(path)
+        
+        return jsonify(
+            path=path, 
+            debug=debug_msgs, 
+            distance_m=round(total_dist), 
+            estimated_time_min=est_time_min,
+            risk_level=risk_level,
+            min_hostile_distance_m=round(min_distance) if min_distance != float('inf') else None
+        )
 
     except Exception as e:
         return jsonify(error=str(e), debug=[str(e)])

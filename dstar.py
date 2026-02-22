@@ -224,6 +224,69 @@ class DStarLite:
         c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
         return R * c
 
+    def calculate_path_risk(self, path):
+        """ 
+        Calculate risk level of a path based on proximity to hostile zones.
+        Returns: (risk_level, min_distance_m)
+            risk_level: 'low', 'medium', or 'high'
+            min_distance_m: minimum distance to hostile zones in meters
+        """
+        if not np.any(self.hostile_mask):
+            # No hostile zones, risk is low
+            return 'low', float('inf')
+        
+        min_distance_m = float('inf')
+        
+        # Sample path points to calculate minimum distance to hostile zones
+        for lat, lon in path:
+            r, c = self.latlon_to_index(lat, lon)
+            
+            if not self.in_bounds(r, c):
+                continue
+            
+            # Check if path point is actually in a hostile zone
+            if self.hostile_mask[r, c]:
+                min_distance_m = 0
+                break
+            
+            # Find nearest hostile cell using a search radius
+            search_radius = 100  # cells
+            found_hostile = False
+            
+            for dr in range(-search_radius, search_radius + 1):
+                for dc in range(-search_radius, search_radius + 1):
+                    nr, nc = r + dr, c + dc
+                    
+                    if not self.in_bounds(nr, nc):
+                        continue
+                    
+                    if self.hostile_mask[nr, nc]:
+                        hostile_lat, hostile_lon = self.index_to_latlon(nr, nc)
+                        dist = self.latlon_distance(lat, lon, hostile_lat, hostile_lon)
+                        min_distance_m = min(min_distance_m, dist)
+                        found_hostile = True
+                        
+                        # Early exit if very close
+                        if min_distance_m < 50:
+                            break
+                
+                if found_hostile and min_distance_m < 50:
+                    break
+            
+            # Early exit if we found path goes through hostile zone
+            if min_distance_m == 0:
+                break
+        
+        # Classify risk based on minimum distance
+        if min_distance_m < 100:  # Less than 100m
+            risk_level = 'high'
+        elif min_distance_m < 300:  # 100-300m
+            risk_level = 'medium'
+        else:  # More than 300m
+            risk_level = 'low'
+        
+        return risk_level, min_distance_m
+
     # ===================== Main Pathfinding =================
     def compute_path(self, start, goal, corridor_m=None, debug=False):
         debug_msgs = []
