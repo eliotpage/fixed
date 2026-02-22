@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Quick decrypt: Decrypt drawings.enc with a single command
 Usage: python quick_decrypt.py [password] [output_file]

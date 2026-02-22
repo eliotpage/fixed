@@ -10,7 +10,6 @@ from lib.dstar import DStarLite
 from dotenv import load_dotenv
 import numpy as np
 
-# ===================== DEMO DATA =====================
 DEMO_DRAWINGS = [
     {"type": "Feature", "properties": {"_id": 1, "deleted": False, "color": "blue", "isMarker": True, "hostile": False},
      "geometry": {"type": "Point", "coordinates": [33.100, 35.100]}},
@@ -33,11 +32,10 @@ DRAWINGS_FILE = os.path.join('data', 'drawings.json')
 SHARED_FILE = os.path.join('data', 'shared.json')
 TILE_DIR = os.path.join('static', 'tiles')
 DEM_PATH = os.path.join('static', 'output_be.tif')
-MERGE_INTERVAL = 10  # seconds
+MERGE_INTERVAL = 10
 
-# ===================== APP SETUP =====================
 app = Flask(__name__)
-load_dotenv()  # Load secrets
+load_dotenv()
 app.secret_key = os.getenv("SECRET_KEY")
 MAIL_USERNAME = os.getenv("MAIL_USERNAME")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
@@ -45,7 +43,6 @@ MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 if not app.secret_key or not MAIL_USERNAME or not MAIL_PASSWORD:
     raise RuntimeError("Missing required environment variables: SECRET_KEY, MAIL_USERNAME, MAIL_PASSWORD")
 
-# ===================== MAIL CONFIG =====================
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
@@ -55,10 +52,8 @@ app.config.update(
 )
 mail = Mail(app)
 
-# ===================== D* LITE =====================
 dstar = DStarLite(DEM_PATH, tile_dir=TILE_DIR, zoom=11)
 
-# ===================== MERGE FUNCTION =====================
 def merge_drawings_loop():
     while True:
         if not os.path.exists(DRAWINGS_FILE) or not os.path.exists(SHARED_FILE):
@@ -88,11 +83,9 @@ def merge_drawings_loop():
                 d_feat = drawings_dict.get(_id)
                 s_feat = shared_dict.get(_id)
 
-                # Both deleted → skip
                 if d_feat and s_feat and d_feat['properties'].get('deleted') and s_feat['properties'].get('deleted'):
                     continue
 
-                # Only in one file → keep
                 if d_feat and not s_feat:
                     merged_dict[_id] = d_feat
                     continue
@@ -100,7 +93,6 @@ def merge_drawings_loop():
                     merged_dict[_id] = s_feat
                     continue
 
-                # Both exist → merge hostile/color/deleted
                 merged = d_feat.copy()
                 merged_props = merged.get('properties', {}).copy()
                 merged_props['deleted'] = d_feat['properties'].get('deleted', False) or s_feat['properties'].get('deleted', False)
@@ -121,7 +113,6 @@ def merge_drawings_loop():
 merge_thread = threading.Thread(target=merge_drawings_loop, daemon=True)
 merge_thread.start()
 
-# ===================== ROUTES =====================
 @app.route('/')
 @app.route('/login')
 def login():
@@ -138,7 +129,6 @@ def logout():
     session.pop('user', None)
     return redirect(url_for('login'))
 
-# ===================== OTP =====================
 @app.route('/request_otp', methods=['POST'])
 def request_otp():
     data = request.get_json()
@@ -171,15 +161,12 @@ def login_verify():
         return jsonify(success=True)
     return jsonify(success=False, error="Invalid or expired OTP")
 
-# ===================== SAVE/LOAD =====================
 @app.route('/save_drawings', methods=['POST'])
 def save_drawings():
-    # Handle both regular JSON and sendBeacon blob
     try:
         if request.is_json:
             data = request.get_json()
         else:
-            # sendBeacon sends as blob
             data = json.loads(request.data.decode('utf-8'))
         
         os.makedirs(os.path.dirname(DRAWINGS_FILE), exist_ok=True)
@@ -202,7 +189,6 @@ def merge_drawings_route():
         with open(SHARED_FILE, 'r') as f:
             shared = json.load(f)
 
-        # Merge hostile/color/deleted as above
         def build_dict(features):
             d = {}
             for f in features:
@@ -237,7 +223,6 @@ def merge_drawings_route():
     except Exception as e:
         return jsonify(error=str(e))
 
-# ===================== PATHFINDING =====================
 @app.route('/compute_path')
 def compute_path():
     try:
@@ -247,22 +232,18 @@ def compute_path():
         goal_lon = float(request.args.get('goal_lon'))
         corridor_m = float(request.args.get('corridor', 50))
 
-        # Load current drawings
         if not os.path.exists(DRAWINGS_FILE):
             return jsonify(error="Drawings file missing")
         with open(DRAWINGS_FILE, 'r') as f:
             drawings = json.load(f)
 
-        # Filter hostile features (deleted ones ignored)
         hostile_features = [f for f in drawings if f['properties'].get('hostile') and not f['properties'].get('deleted')]
         print(f"[Path] Computing path with {len(hostile_features)} hostile features out of {len(drawings)} total drawings")
         for hf in hostile_features:
             print(f"  - Hostile {hf['geometry']['type']}: ID={hf['properties']['_id']}, Color={hf['properties'].get('color')}")
 
-        # Apply hostile zones to cost map: entire hostile shape blocked, influence slope around
         dstar.apply_hostile_zones(hostile_features, influence_radius_m=100)
 
-        # Compute path using D* Lite (with corridor)
         path, debug_msgs = dstar.compute_path(
             (start_lat, start_lon),
             (goal_lat, goal_lon),
@@ -272,9 +253,8 @@ def compute_path():
         if not path:
             return jsonify(error="No path found", debug=debug_msgs)
 
-        # Compute distance & estimated time
         total_dist = 0
-        R = 6371000  # radius of the Earth in meters
+        R = 6371000
         for i in range(1, len(path)):
             lat1, lon1 = path[i-1]
             lat2, lon2 = path[i]
@@ -286,7 +266,6 @@ def compute_path():
 
         est_time_min = round(total_dist / 1.4 / 60, 1)
         
-        # Calculate path risk based on proximity to hostile zones
         risk_level, min_distance = dstar.calculate_path_risk(path)
         
         return jsonify(
@@ -301,7 +280,6 @@ def compute_path():
     except Exception as e:
         return jsonify(error=str(e), debug=[str(e)])
 
-# ===================== TILE BOUNDS =====================
 @app.route('/tile_bounds')
 def tile_bounds():
     zoom = 11
@@ -340,7 +318,6 @@ def tile_bounds():
 
     return jsonify(bounds=[[south, west], [north, east]], center=[center_lat, center_lon], minZoom=11, maxZoom=16)
 
-# ===================== INIT =====================
 if __name__ == "__main__":
     os.makedirs('static', exist_ok=True)
 

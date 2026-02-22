@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Encrypt and compress drawings.json using custom encryption based on hashing.py
 """
@@ -20,20 +19,14 @@ def encrypt_data(data, password):
     Returns:
         encrypted bytes
     """
-    # Generate encryption key from password using SHA256
     key_hash = sha256(password)
-    # Convert hex hash to integer seed for RNG
-    seed = int(key_hash[:16], 16)  # Use first 64 bits as seed
+    seed = int(key_hash[:16], 16)
     
-    # Initialize RNG with seed
     rng = RNG(seed)
     
-    # Generate keystream and XOR with data
     encrypted = bytearray()
     for byte in data:
-        # Get next random byte from RNG
         key_byte = rng.next() & 0xFF
-        # XOR with data byte
         encrypted.append(byte ^ key_byte)
     
     return bytes(encrypted)
@@ -53,7 +46,6 @@ def compress_and_encrypt(input_file, output_file, password):
         data = f.read()
     
     print(f"[2/4] Compressing data...")
-    # Compress the JSON data
     compressed = gzip.compress(data.encode('utf-8'))
     original_size = len(data.encode('utf-8'))
     compressed_size = len(compressed)
@@ -62,11 +54,9 @@ def compress_and_encrypt(input_file, output_file, password):
     print(f"      Compression ratio: {compressed_size/original_size*100:.1f}%")
     
     print(f"[3/4] Encrypting data...")
-    # Encrypt the compressed data
     encrypted = encrypt_data(compressed, password)
     
     print(f"[4/4] Saving to {output_file}...")
-    # Save encrypted data
     with open(output_file, 'wb') as f:
         f.write(encrypted)
     
@@ -82,11 +72,9 @@ def decompress_and_decrypt(input_file, output_file, password):
         encrypted = f.read()
     
     print(f"[2/4] Decrypting data...")
-    # Decrypt the data
     decrypted = decrypt_data(encrypted, password)
     
     print(f"[3/4] Decompressing data...")
-    # Decompress
     try:
         decompressed = gzip.decompress(decrypted)
     except Exception as e:
@@ -94,7 +82,6 @@ def decompress_and_decrypt(input_file, output_file, password):
         return False
     
     print(f"[4/4] Saving to {output_file}...")
-    # Save decompressed JSON
     with open(output_file, 'w') as f:
         f.write(decompressed.decode('utf-8'))
     
@@ -107,7 +94,6 @@ def main():
     print("=" * 60)
     print()
     
-    # Check if input file exists
     if not os.path.exists(INPUT_FILE):
         print(f"✗ Error: {INPUT_FILE} not found!")
         return
@@ -120,7 +106,6 @@ def main():
     choice = input("Enter choice (1 or 2): ").strip()
     
     if choice == '1':
-        # Encrypt mode
         print()
         password = getpass.getpass("Enter encryption password: ")
         password_confirm = getpass.getpass("Confirm password: ")
@@ -137,7 +122,6 @@ def main():
         compress_and_encrypt(INPUT_FILE, OUTPUT_FILE, password)
         
     elif choice == '2':
-        # Decrypt mode
         if not os.path.exists(OUTPUT_FILE):
             print(f"✗ Error: {OUTPUT_FILE} not found!")
             return

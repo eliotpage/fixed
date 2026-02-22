@@ -2,15 +2,12 @@ import math
 import os
 import requests
 
-# Tile provider
 TILE_URL = "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
 SUBDOMAINS = ["a", "b", "c"]
 
-# Zoom levels
 MIN_ZOOM = 9
 MAX_ZOOM = 10
 
-# Bounding box
 MIN_LAT = 34.8
 MAX_LAT = 35.3
 MIN_LON = 32.7
@@ -18,7 +15,6 @@ MAX_LON = 34.3
 
 OUT_DIR = "static/tiles"
 
-# ============================
 def latlon_to_tile(lat, lon, z):
     n = 2 ** z
     x = int((lon + 180) / 360 * n)

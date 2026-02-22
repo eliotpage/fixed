@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Quick test of file encryption with drawings.json
 """
@@ -9,7 +8,6 @@ def main():
     print("Testing file encryption with drawings.json")
     print("=" * 60)
     
-    # Check if drawings.json exists
     if not os.path.exists('drawings.json'):
         print("✗ drawings.json not found!")
         return
@@ -34,7 +32,6 @@ def main():
         return
     
     print("\n[3/3] Verifying files match...")
-    # Compare original and decrypted
     with open('drawings.json', 'rb') as f:
         original = f.read()
     with open('drawings_test_decrypted.json', 'rb') as f:
@@ -46,7 +43,6 @@ def main():
         print("  ✗ Files don't match!")
         return
     
-    # Test with wrong password
     print("\n[Test] Trying wrong password...")
     success = decrypt_file('drawings_test.enc', 'drawings_wrong.json', 'wrong_password')
     if not success:
@@ -54,7 +50,6 @@ def main():
     else:
         print("  ✗ Wrong password was accepted (shouldn't happen)")
     
-    # Cleanup
     print("\n[Cleanup] Removing test files...")
     os.remove('drawings_test.enc')
     os.remove('drawings_test_decrypted.json')

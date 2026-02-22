@@ -221,7 +221,7 @@
     </head>
 
     <body>
-        <!-- In-page alert -->
+        
         <div id="site-alert"></div>
 
         <div id="header-container">
@@ -266,28 +266,28 @@
         <script src="static/leaflet/leaflet.js"></script>
         <script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
         <script>
-            // ================== IN-PAGE ALERT ==================
+
             function showAlert(msg, type='error', duration=5000) {
                 const alertDiv = document.getElementById('site-alert');
                 
-                // Map risk levels to alert types
+
                 if (type === 'low') {
-                    alertDiv.style.background = '#4CAF50'; // Green for low risk
+                    alertDiv.style.background = '#4CAF50';
                     msg = '🟢 ' + msg;
                 } else if (type === 'medium') {
-                    alertDiv.style.background = '#FF9800'; // Orange for medium risk
+                    alertDiv.style.background = '#FF9800';
                     msg = '🟡 ' + msg;
                 } else if (type === 'high') {
-                    alertDiv.style.background = '#f44336'; // Red for high risk
+                    alertDiv.style.background = '#f44336';
                     msg = '🔴 ' + msg;
                 } else if (type === 'success') {
-                    alertDiv.style.background = '#4CAF50'; // Green for success
+                    alertDiv.style.background = '#4CAF50';
                 } else if (type === 'warning') {
-                    alertDiv.style.background = '#FF9800'; // Orange for warning
+                    alertDiv.style.background = '#FF9800';
                 } else if (type === 'info') {
-                    alertDiv.style.background = '#2196F3'; // Blue for info
+                    alertDiv.style.background = '#2196F3';
                 } else {
-                    alertDiv.style.background = '#f44336'; // Red for error
+                    alertDiv.style.background = '#f44336';
                 }
                 
                 alertDiv.textContent = msg;
@@ -295,7 +295,7 @@
                 setTimeout(() => { alertDiv.style.display = 'none'; }, duration);
             }
 
-            // ================== GLOBALS ==================
+
             let map = L.map('map', {
                 center: [35.029294, 33.050995],
                 zoom: 11,
@@ -315,7 +315,7 @@
             const POLL_INTERVAL_SEC = 10;
             const POLL_INTERVAL = POLL_INTERVAL_SEC * 1000;
 
-            // ================== COLORS ==================
+
             const COLORS = ['blue', 'red', 'green', 'orange', 'yellow', 'violet', 'grey', 'black'];
             let currentColor = 'blue';
             let markerIcons = {};
@@ -330,7 +330,7 @@
                 });
             });
 
-            // ================== COLOR SELECTOR ==================
+
             L.Control.ColorToggle = L.Control.extend({
                 onAdd: function (map) {
                     const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
@@ -367,13 +367,13 @@
             colorContainer.style.marginTop = '80px';
             colorContainer.style.marginLeft = '50px';
 
-            // ================== DRAW CONTROL ==================
+
             let drawControl = new L.Control.Draw({
                 position: 'topleft',
                 draw: {
                     polygon: { 
                         shapeOptions: { color: currentColor },
-                        repeatMode: false  // Stop after drawing one shape
+                        repeatMode: false
                     },
                     polyline: { 
                         shapeOptions: { color: currentColor },
@@ -401,15 +401,15 @@
                 edit: {
                     featureGroup: editableLayers,
                     remove: true,
-                    edit: false  // Disable edit, keep only delete
+                    edit: false
                 }
             });
             map.addControl(drawControl);
 
-            // Store reference to draw control for later use
+
             window.mapDrawControl = drawControl;
 
-            // ================== HELPERS ==================
+
             function layerToFeature(layer, color) {
                 if (!layer._leaflet_id) layer._leaflet_id = L.stamp(layer);
                 let f = { type: "Feature", properties: { _id: layer._leaflet_id, deleted: false, color, hostile: layer._hostile || false }, geometry: {} };
@@ -442,7 +442,7 @@
                 return layer;
             }
 
-            // ================== POPUPS ==================
+
             function bindMarkerPopup(layer) {
                 const ll = layer.getLatLng();
                 layer.bindPopup(`
@@ -492,14 +492,14 @@
                 });
             }
 
-            // ================== SAVE/LOAD ==================
+
             function saveDrawings() {
                 console.log('Saving', drawings.length, 'drawings...');
                 fetch('/save_drawings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(drawings),
-                    keepalive: true  // Ensures request completes even if page is closing
+                    keepalive: true
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -521,7 +521,7 @@
                             const l = featureToLayer(f);
                             if (l) {
                                 editableLayers.addLayer(l);
-                                // Bind popups which automatically makes layers clickable
+
                                 if (f.properties.isMarker) bindMarkerPopup(l);
                                 else bindShapePopup(l);
                                 loadedCount++;
@@ -532,7 +532,7 @@
                     .catch(err => console.error("Error loading drawings:", err));
             }
 
-            // Initialize with demo drawings
+
             function initializeDemoDrawings() {
                 const demoDrawings = [
                     {"type": "Feature", "properties": {"_id": 1, "deleted": false, "color": "blue", "isMarker": true, "hostile": false},
@@ -563,26 +563,26 @@
                 console.log('Demo drawings initialized');
             }
 
-            // ================== DRAW EVENTS ==================
+
             map.on(L.Draw.Event.CREATED, function (e) {
                 const layer = e.layer;
                 layer._hostile = false;
                 
-                // Apply color styling
+
                 if (layer instanceof L.Circle || layer instanceof L.CircleMarker || layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Rectangle)
                     layer.setStyle({ color: currentColor, fillColor: currentColor });
                 if (layer instanceof L.Marker) layer.setIcon(markerIcons[currentColor]);
 
-                // Add to map and save
+
                 editableLayers.addLayer(layer);
                 const feature = layerToFeature(layer, currentColor);
                 drawings.push(feature);
 
-                // Bind popup
+
                 if (layer instanceof L.Marker) bindMarkerPopup(layer);
                 else bindShapePopup(layer);
 
-                // Save immediately
+
                 saveDrawings();
                 console.log('Created and saved:', feature.properties._id);
             });
@@ -598,20 +598,20 @@
                 saveDrawings();
             });
 
-            // Handle draw lifecycle events
+
             map.on(L.Draw.Event.DRAWSTART, function (e) {
                 console.log('Draw mode started');
             });
 
             map.on(L.Draw.Event.DRAWSTOP, function (e) {
-                // Clean up any leftover UI elements
+
                 const toolbar = document.querySelector('.leaflet-draw-actions');
                 if (toolbar) toolbar.style.display = 'none';
                 map.getContainer().style.cursor = '';
                 console.log('Draw mode stopped');
             });
 
-            // Delete mode handlers
+
             map.on(L.Draw.Event.DELETESTART, function (e) {
                 console.log('Delete mode started');
             });
@@ -623,7 +623,7 @@
                 console.log('Delete mode stopped');
             });
 
-            // ================== COPY/PASTE ==================
+
             map.on('click', e => map.lastClick = e.latlng);
 
             document.querySelectorAll('.paste-btn').forEach(btn => btn.addEventListener('click', () => {
@@ -656,12 +656,12 @@
                 }
             });
 
-            // ================== CORRIDOR SLIDER ==================
+
             document.getElementById('corridorWidth').addEventListener('input', function () {
                 document.getElementById('corridorValue').textContent = this.value;
             });
 
-            // ================== PATH PLOTTING ==================
+
             function plotPath() {
                 const s = document.getElementById('start').value.split(',');
                 const g = document.getElementById('goal').value.split(',');
@@ -681,7 +681,7 @@
                 fetch(`/compute_path?start_lat=${start_lat}&start_lon=${start_lon}&goal_lat=${goal_lat}&goal_lon=${goal_lon}&corridor=${corridor}`)
                     .then(r => r.json())
                     .then(res => {
-                        // Log debug messages
+
                         if (res.debug) {
                             console.log('=== PATH COMPUTATION DEBUG ===');
                             res.debug.forEach(msg => console.log(msg));
@@ -703,7 +703,7 @@
                         console.log(`Path found with ${res.path.length} waypoints`);
                         console.log(`Distance: ${res.distance_m}m, Estimated time: ${res.estimated_time_min} min`);
                         
-                        // Display risk alert
+
                         const riskLevel = res.risk_level ? res.risk_level.toLowerCase() : 'info';
                         
                         let alertMsg = `${riskLevel.toUpperCase()} RISK PATH\n\n`;
@@ -724,11 +724,11 @@
                         showAlert(alertMsg, riskLevel, 8000);
                         console.log(`Risk Level: ${riskLevel.toUpperCase()}, Min Distance: ${res.min_hostile_distance_m}m`);
                         
-                        // Remove old path if it exists
+
                         const oldPathIdx = drawings.findIndex(f => f.properties._id === 'path');
                         if (oldPathIdx >= 0) {
                             drawings[oldPathIdx].properties.deleted = true;
-                            // Find and remove the old path layer
+
                             editableLayers.eachLayer(layer => {
                                 if (layer._leaflet_id === 'path') {
                                     editableLayers.removeLayer(layer);
@@ -736,18 +736,18 @@
                             });
                         }
                         
-                        // Create new path layer
+
                         const path = L.polyline(res.path.map(p => [p[0], p[1]]), { color: 'red' });
-                        path._leaflet_id = 'path';  // Set the ID
+                        path._leaflet_id = 'path';
                         path._hostile = false;
                         
-                        // Add to editableLayers so it can be edited/deleted
+
                         editableLayers.addLayer(path);
                         
-                        // Bind popup to make it deletable
+
                         bindShapePopup(path);
                         
-                        // Save to drawings
+
                         const pathFeature = {
                             type: "Feature",
                             properties: { _id: 'path', color: 'red', hostile: false, deleted: false },
@@ -763,22 +763,22 @@
                     });
             }
 
-            // ================== CLEAR PATH ==================
+
             function clearPath() {
-                // Find and remove path layer from editableLayers
+
                 editableLayers.eachLayer(layer => {
                     if (layer._leaflet_id === 'path') {
                         editableLayers.removeLayer(layer);
                     }
                 });
-                // Mark as deleted in drawings
+
                 const idx = drawings.findIndex(f => f.properties._id === 'path');
                 if (idx >= 0) drawings[idx].properties.deleted = true;
                 saveDrawings();
                 console.log('Path cleared');
             }
 
-            // ================== REFRESH TIMER (Persistent using epoch) ==================
+
             const TIMER_KEY = 'nextMergeEpoch';
             let nextMergeEpoch = parseFloat(localStorage.getItem(TIMER_KEY)) || (Date.now() / 1000 + POLL_INTERVAL_SEC);
 
@@ -810,15 +810,15 @@
                 }
             });
 
-            // ================== SAVE BEFORE UNLOAD ==================
+
             window.addEventListener('beforeunload', function(e) {
-                // Use sendBeacon for reliable save on page unload
+
                 console.log('Page closing, saving with sendBeacon...');
                 const blob = new Blob([JSON.stringify(drawings)], {type: 'application/json'});
                 navigator.sendBeacon('/save_drawings', blob);
             });
 
-            // Auto-save periodically as backup (every 10 seconds)
+
             setInterval(function() {
                 if (drawings.length > 0) {
                     console.log('Auto-save triggered');
@@ -826,7 +826,7 @@
                 }
             }, 10000);
 
-            // ================== INITIAL LOAD ==================
+
             console.log('Initializing map...');
             safeLoadDrawings();
         </script>

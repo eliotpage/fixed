@@ -19,20 +19,14 @@ def encrypt_bytes(data, password):
     if isinstance(password, str):
         password = password.encode('utf-8')
     
-    # Generate encryption key from password using SHA256
     key_hash = sha256(password)
-    # Convert hex hash to integer seed for RNG
-    seed = int(key_hash[:16], 16)  # Use first 64 bits as seed
+    seed = int(key_hash[:16], 16)
     
-    # Initialize RNG with seed
     rng = RNG(seed)
     
-    # Generate keystream and XOR with data
     encrypted = bytearray()
     for byte in data:
-        # Get next random byte from RNG
         key_byte = rng.next() & 0xFF
-        # XOR with data byte
         encrypted.append(byte ^ key_byte)
     
     return bytes(encrypted)
@@ -64,10 +58,8 @@ def compress_and_encrypt(data, password):
     if isinstance(data, str):
         data = data.encode('utf-8')
     
-    # Compress
     compressed = gzip.compress(data)
     
-    # Encrypt
     encrypted = encrypt_bytes(compressed, password)
     
     return encrypted
@@ -83,15 +75,12 @@ def decrypt_and_decompress(data, password):
     Returns:
         decompressed bytes, or None if decryption failed
     """
-    # Decrypt
     decrypted = decrypt_bytes(data, password)
     
-    # Decompress
     try:
         decompressed = gzip.decompress(decrypted)
         return decompressed
     except Exception:
-        # Wrong password or corrupted data
         return None
 
 def encrypt_file(input_path, output_path, password, compress=True):
@@ -107,19 +96,16 @@ def encrypt_file(input_path, output_path, password, compress=True):
     Returns:
         dict with statistics (original_size, final_size, etc.)
     """
-    # Read input file
     with open(input_path, 'rb') as f:
         data = f.read()
     
     original_size = len(data)
     
-    # Encrypt (with optional compression)
     if compress:
         encrypted = compress_and_encrypt(data, password)
     else:
         encrypted = encrypt_bytes(data, password)
     
-    # Write output file
     with open(output_path, 'wb') as f:
         f.write(encrypted)
     
@@ -145,11 +131,9 @@ def decrypt_file(input_path, output_path, password, compressed=True):
     Returns:
         True if successful, False if decryption failed
     """
-    # Read encrypted file
     with open(input_path, 'rb') as f:
         encrypted = f.read()
     
-    # Decrypt (with optional decompression)
     if compressed:
         decrypted = decrypt_and_decompress(encrypted, password)
         if decrypted is None:
@@ -157,44 +141,37 @@ def decrypt_file(input_path, output_path, password, compressed=True):
     else:
         decrypted = decrypt_bytes(encrypted, password)
     
-    # Write output file
     with open(output_path, 'wb') as f:
         f.write(decrypted)
     
     return True
 
-# Example usage
 if __name__ == '__main__':
     print("Crypto Utils Library")
     print("=" * 50)
     print()
     print("Example: Encrypt and decrypt a message")
     
-    # Example 1: Simple encryption
     message = "Hello, this is a secret message!"
     password = "my_secret_password"
     
     print(f"Original: {message}")
     
-    # Encrypt
     encrypted = encrypt_bytes(message.encode(), password)
     print(f"Encrypted (hex): {encrypted.hex()[:50]}...")
     
-    # Decrypt
     decrypted = decrypt_bytes(encrypted, password)
     print(f"Decrypted: {decrypted.decode()}")
     
     print()
     print("Example: Compress and encrypt")
     
-    # Example 2: With compression
-    long_message = "abc" * 100  # Repetitive data compresses well
+    long_message = "abc" * 100
     compressed_encrypted = compress_and_encrypt(long_message, password)
     
     print(f"Original size: {len(long_message)} bytes")
     print(f"Compressed+Encrypted: {len(compressed_encrypted)} bytes")
     print(f"Compression ratio: {len(compressed_encrypted)/len(long_message)*100:.1f}%")
     
-    # Decrypt and decompress
     decrypted_decompressed = decrypt_and_decompress(compressed_encrypted, password)
     print(f"Match: {decrypted_decompressed.decode() == long_message}")

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Quick encrypt: Encrypt drawings.json with a single command
 Usage: python quick_encrypt.py [password]

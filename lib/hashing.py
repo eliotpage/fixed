@@ -1,6 +1,5 @@
 import time
 
-# ================= Simple RNG =================
 class RNG:
     def __init__(self, seed):
         self.state = seed & 0xFFFFFFFFFFFFFFFF
@@ -19,7 +18,6 @@ class RNG:
             out += hex(self.next() & 0xF)[2:]
         return out
 
-# ================= SHA-256 from scratch =================
 def rotr(x, n):
     return ((x >> n) | (x << (32 - n))) & 0xFFFFFFFF
 
@@ -68,18 +66,13 @@ def sha256(msg):
         h = [(x+y)&0xFFFFFFFF for x,y in zip(h,[a,b,c,d,e,f,g,hv])]
     return ''.join(f'{x:08x}' for x in h)
 
-# ================= OTP =================
-DB = {}  # Store OTP hash + expiration
+DB = {}
 
 def generate_otp(secret, user):
-    # Seed RNG with microtime for randomness
     rng = RNG(int(time.time()*1000000))
-    # 32-bit random token
     rand = rng.token(16)
-    # OTP string = user + expiration + random
-    exp = int(time.time()) + 300  # 5 min expiration
+    exp = int(time.time()) + 300
     token_str = f"{exp}:{rand}"
-    # Hash it with SHA256 + secret
     otp_hash = sha256(secret + token_str)
     DB[user] = {"hash": otp_hash, "exp": exp}
     return token_str
