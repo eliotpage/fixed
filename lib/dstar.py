@@ -91,6 +91,9 @@ class DStarLite:
         tile_size = 256
         for x_tile in os.listdir(os.path.join(tile_dir, str(zoom))):
             x_path = os.path.join(tile_dir, str(zoom), x_tile)
+            # Skip files like .gitkeep, only process directories
+            if not os.path.isdir(x_path):
+                continue
             for y_file in os.listdir(x_path):
                 if not y_file.endswith(".png"):
                     continue
