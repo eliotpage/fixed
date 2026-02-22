@@ -2,6 +2,7 @@ import math
 import os
 import requests
 
+# OpenTopoMap tile server - cached locally for pathfinding DEM data
 TILE_URL = "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
 SUBDOMAINS = ["a", "b", "c"]
 
@@ -15,6 +16,7 @@ MAX_LON = 34.3
 
 OUT_DIR = "static/tiles"
 
+# Convert latitude/longitude to tile coordinates at given zoom level
 def latlon_to_tile(lat, lon, z):
     n = 2 ** z
     x = int((lon + 180) / 360 * n)

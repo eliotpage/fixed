@@ -201,6 +201,7 @@ class DStarLite:
         c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
         return R * c
 
+    # Assess path risk based on proximity to hostile zones (Low/Medium/High)
     def calculate_path_risk(self, path):
         """ 
         Calculate risk level of a path based on proximity to hostile zones.

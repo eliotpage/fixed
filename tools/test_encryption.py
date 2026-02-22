@@ -1,9 +1,11 @@
 """
 Quick test of file encryption with drawings.json
+Validates encryption/decryption cycle and reports compression statistics
 """
 from crypto_utils import encrypt_file, decrypt_file
 import os
 
+# Test suite: encrypt, decrypt, and verify round-trip success
 def main():
     print("Testing file encryption with drawings.json")
     print("=" * 60)

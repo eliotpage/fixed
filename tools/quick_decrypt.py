@@ -1,10 +1,12 @@
 """
 Quick decrypt: Decrypt drawings.enc with a single command
+Fast CLI wrapper for decompressing and decrypting encrypted files
 Usage: python quick_decrypt.py [password] [output_file]
 """
 import sys
 from crypto_utils import decrypt_file
 
+# Main entry point: validate password and decrypt file
 def main():
     if len(sys.argv) < 2:
         print("Usage: python quick_decrypt.py <password> [output_file]")

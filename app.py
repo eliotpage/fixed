@@ -10,6 +10,7 @@ from lib.dstar import DStarLite
 from dotenv import load_dotenv
 import numpy as np
 
+# Demo data for testing
 DEMO_DRAWINGS = [
     {"type": "Feature", "properties": {"_id": 1, "deleted": False, "color": "blue", "isMarker": True, "hostile": False},
      "geometry": {"type": "Point", "coordinates": [33.100, 35.100]}},
@@ -52,8 +53,10 @@ app.config.update(
 )
 mail = Mail(app)
 
+# Initialize pathfinding engine with terrain data
 dstar = DStarLite(DEM_PATH, tile_dir=TILE_DIR, zoom=11)
 
+# Background thread to merge drawings with shared data every 10 seconds
 def merge_drawings_loop():
     while True:
         if not os.path.exists(DRAWINGS_FILE) or not os.path.exists(SHARED_FILE):
@@ -113,6 +116,7 @@ def merge_drawings_loop():
 merge_thread = threading.Thread(target=merge_drawings_loop, daemon=True)
 merge_thread.start()
 
+# Authentication routes
 @app.route('/')
 @app.route('/login')
 def login():
@@ -129,6 +133,7 @@ def logout():
     session.pop('user', None)
     return redirect(url_for('login'))
 
+# OTP authentication - sends one-time password via email
 @app.route('/request_otp', methods=['POST'])
 def request_otp():
     data = request.get_json()
@@ -149,6 +154,7 @@ def request_otp():
         print("[Mail Error]", e)
         return jsonify(success=False, error="Failed to send OTP")
 
+# OTP verification against time-based token (case-insensitive, 5-minute window)
 @app.route('/login_verify', methods=['POST'])
 def login_verify():
     data = request.get_json()
@@ -161,6 +167,8 @@ def login_verify():
         return jsonify(success=True)
     return jsonify(success=False, error="Invalid or expired OTP")
 
+# Save user's drawings to local JSON database
+# Store user-drawn features persistently to local JSON database
 @app.route('/save_drawings', methods=['POST'])
 def save_drawings():
     try:
@@ -178,6 +186,7 @@ def save_drawings():
         print(f"[Save Error] {e}")
         return jsonify(success=False, error=str(e)), 400
 
+# Merge user and shared drawings, prioritizing shared data for colors and deletion status
 @app.route('/merge_drawings')
 def merge_drawings_route():
     try:
@@ -223,6 +232,7 @@ def merge_drawings_route():
     except Exception as e:
         return jsonify(error=str(e))
 
+# Calculate optimal path avoiding hostile zones with risk assessment
 @app.route('/compute_path')
 def compute_path():
     try:

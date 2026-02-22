@@ -1,5 +1,6 @@
 """
 Crypto utilities for encrypting/decrypting files using hashing.py
+Uses SHA-256 key derivation + stream cipher for encryption, gzip for compression
 Can be imported as a library or used standalone
 """
 import gzip
@@ -44,6 +45,7 @@ def decrypt_bytes(data, password):
     """
     return encrypt_bytes(data, password)
 
+# Main function: compress to JSON, gzip it, then encrypt with password
 def compress_and_encrypt(data, password):
     """
     Compress data with gzip and then encrypt

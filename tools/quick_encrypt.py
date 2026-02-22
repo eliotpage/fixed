@@ -1,10 +1,12 @@
 """
 Quick encrypt: Encrypt drawings.json with a single command
+Fast CLI wrapper around compress_and_encrypt for command-line use
 Usage: python quick_encrypt.py [password]
 """
 import sys
 from crypto_utils import encrypt_file
 
+# Main entry point: validate password and encrypt file with stats
 def main():
     if len(sys.argv) < 2:
         print("Usage: python quick_encrypt.py <password>")

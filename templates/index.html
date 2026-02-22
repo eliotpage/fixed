@@ -564,6 +564,7 @@
             }
 
 
+            // Handle new shapes/markers drawn on map
             map.on(L.Draw.Event.CREATED, function (e) {
                 const layer = e.layer;
                 layer._hostile = false;
@@ -587,6 +588,7 @@
                 console.log('Created and saved:', feature.properties._id);
             });
 
+            // Handle deleted shapes - mark as deleted in database
             map.on(L.Draw.Event.DELETED, function (e) {
                 e.layers.eachLayer(l => {
                     const f = drawings.find(f => f.properties._id === l._leaflet_id);
@@ -662,6 +664,7 @@
             });
 
 
+            // Calculate and display optimal path from start to goal
             function plotPath() {
                 const s = document.getElementById('start').value.split(',');
                 const g = document.getElementById('goal').value.split(',');

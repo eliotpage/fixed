@@ -1,5 +1,6 @@
 import time
 
+# Pseudorandom number generator for cryptographic stream cipher
 class RNG:
     def __init__(self, seed):
         self.state = seed & 0xFFFFFFFFFFFFFFFF
@@ -37,6 +38,7 @@ K = [
     0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 ]
 
+# SHA-256 implementation for key derivation in encryption
 def sha256(msg):
     if isinstance(msg, str): msg = msg.encode()
     h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,

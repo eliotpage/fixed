@@ -1,5 +1,6 @@
 """
-Encrypt and compress drawings.json using custom encryption based on hashing.py
+CLI tool: Encrypt and compress drawings.json using custom encryption
+Uses SHA-256 key derivation with RNG-based stream cipher and gzip compression
 """
 import os
 import json
@@ -10,6 +11,7 @@ from hashing import sha256, RNG
 INPUT_FILE = 'drawings.json'
 OUTPUT_FILE = 'drawings.enc'
 
+# Generate SHA-256 hash from password, seed RNG, and XOR bytes with keystream
 def encrypt_data(data, password):
     """
     Encrypt data using stream cipher with RNG keystream
