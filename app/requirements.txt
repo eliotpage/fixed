@@ -1,0 +1,10 @@
+flask
+flask-mail
+python-dotenv
+rasterio
+pyproj
+shapely
+pillow
+scipy
+numpy
+requests

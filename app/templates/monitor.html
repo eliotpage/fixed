@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>POPMAP Monitor</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: "Segoe UI", sans-serif;
+            background: #f4f4f4;
+        }
+
+        /* Header */
+        #header-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            padding: 10px 20px;
+            background: #2c3e50;
+            color: white;
+        }
+
+        #header-container h1 {
+            font-size: 24px;
+            font-weight: 400;
+            margin: 0;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            padding: 15px 20px;
+            background: #f4f4f4;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 12px;
+            border-radius: 4px;
+            border-left: 3px solid #2980b9;
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            color: #666;
+            margin: 0 0 6px 0;
+            font-weight: 500;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2980b9;
+        }
+
+        /* Container */
+        .container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+            padding: 15px 20px;
+            height: calc(100vh - 200px);
+        }
+
+        .panel {
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel h2 {
+            color: #2c3e50;
+            margin: 0;
+            padding: 10px 15px;
+            font-size: 16px;
+            font-weight: 500;
+            border-bottom: 1px solid #eee;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .controls button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #2980b9;
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .controls button:hover {
+            background: #3498db;
+        }
+
+        .log-container {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            background: #fafafa;
+        }
+
+        .log-entry {
+            padding: 8px 15px;
+            border-bottom: 1px solid #eee;
+            word-wrap: break-word;
+        }
+
+        .log-entry:hover {
+            background: #f0f0f0;
+        }
+
+        .timestamp {
+            color: #999;
+        }
+
+        .ip {
+            color: #e74c3c;
+        }
+
+        .method-GET {
+            color: #27ae60;
+        }
+
+        .method-POST {
+            color: #f39c12;
+        }
+
+        .method-PUT,
+        .method-DELETE {
+            color: #e74c3c;
+        }
+
+        .status-2xx {
+            color: #27ae60;
+        }
+
+        .status-3xx {
+            color: #3498db;
+        }
+
+        .status-4xx,
+        .status-5xx {
+            color: #e74c3c;
+        }
+
+        .action-entry {
+            padding: 10px 15px;
+            margin: 5px 0;
+            background: white;
+            border-left: 3px solid #f39c12;
+            border-radius: 2px;
+        }
+
+        .action-ok {
+            border-left-color: #27ae60;
+        }
+
+        .action-error {
+            border-left-color: #e74c3c;
+        }
+
+        .action-entry .timestamp {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f4f4f4;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #bbb;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="header-container">
+        <h1>POPMAP Monitor</h1>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <h3>Total Requests</h3>
+            <div class="value" id="total-requests">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Active Sessions</h3>
+            <div class="value" id="active-sessions">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Actions Logged</h3>
+            <div class="value" id="total-actions">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Refresh Rate</h3>
+            <div class="value">3s</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Traffic Log</h2>
+            <div class="controls">
+                <button id="pauseBtn" onclick="togglePause()">Pause</button>
+                <button onclick="clearTraffic()">Clear</button>
+            </div>
+            <div class="log-container" id="traffic-log"></div>
+        </div>
+
+        <div class="panel">
+            <h2>User Actions</h2>
+            <div class="controls">
+                <button onclick="clearActions()">Clear</button>
+            </div>
+            <div class="log-container" id="actions-log"></div>
+        </div>
+    </div>
+    
+    <script>
+        let isPaused = false;
+        let previousTrafficCount = 0;
+        let previousActionsCount = 0;
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pauseBtn');
+            btn.textContent = isPaused ? 'Resume' : 'Pause';
+        }
+        
+        function clearTraffic() {
+            document.getElementById('traffic-log').innerHTML = '';
+        }
+        
+        function clearActions() {
+            document.getElementById('actions-log').innerHTML = '';
+        }
+        
+        function parseTrafficEntry(entry) {
+            const parts = entry.split('|');
+            if (parts.length < 2) return entry;
+            
+            const timestamp = parts[0].trim();
+            const details = parts[1].trim();
+            
+            let html = `<span class="timestamp">${timestamp}</span> | `;
+            
+            const ipMatch = details.match(/ip=([\d\.]+)/);
+            const methodMatch = details.match(/method=(\w+)/);
+            const pathMatch = details.match(/path=([^\s]+)/);
+            const statusMatch = details.match(/status=(\d+)/);
+            const durationMatch = details.match(/duration_ms=([\d\.]+)/);
+            
+            if (ipMatch) {
+                html += `<span class="ip">${ipMatch[1]}</span> `;
+            }
+            
+            if (methodMatch) {
+                const method = methodMatch[1];
+                html += `<span class="method-${method}">${method}</span> `;
+            }
+            
+            if (pathMatch) {
+                html += `<span>${pathMatch[1]}</span> `;
+            }
+            
+            if (statusMatch) {
+                const status = statusMatch[1];
+                const statusClass = `status-${status[0]}xx`;
+                html += `<span class="${statusClass}">[${status}]</span> `;
+            }
+            
+            if (durationMatch) {
+                html += `<span style="color: #999">${durationMatch[1]}ms</span>`;
+            }
+            
+            return html;
+        }
+        
+        function parseActionEntry(entry) {
+            const parts = entry.split('|');
+            if (parts.length < 2) return entry;
+            
+            const timestamp = parts[0].trim();
+            const details = parts[1].trim();
+            
+            const resultMatch = details.match(/result=(\w+)/);
+            const actionClass = resultMatch && resultMatch[1] === 'ok' ? 'action-ok' : 'action-error';
+            
+            return `
+                <div class="action-entry ${actionClass}">
+                    <div class="timestamp">${timestamp}</div>
+                    <div>${details}</div>
+                </div>
+            `;
+        }
+        
+        async function fetchData() {
+            if (isPaused) return;
+            
+            try {
+                const response = await fetch('/monitor/data');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error fetching data:', data.error);
+                    return;
+                }
+                
+                // Update stats
+                document.getElementById('total-requests').textContent = data.total_traffic || 0;
+                document.getElementById('active-sessions').textContent = data.active_sessions || 0;
+                document.getElementById('total-actions').textContent = data.total_actions || 0;
+                
+                // Update traffic log
+                const trafficContainer = document.getElementById('traffic-log');
+                const shouldScrollTraffic = trafficContainer.scrollTop + trafficContainer.clientHeight >= trafficContainer.scrollHeight - 50;
+                
+                trafficContainer.innerHTML = data.traffic.map((entry, idx) => {
+                    return `<div class="log-entry">${parseTrafficEntry(entry)}</div>`;
+                }).join('');
+                
+                if (shouldScrollTraffic) {
+                    trafficContainer.scrollTop = trafficContainer.scrollHeight;
+                }
+                
+                previousTrafficCount = data.traffic.length;
+                
+                // Update actions log
+                const actionsContainer = document.getElementById('actions-log');
+                const shouldScrollActions = actionsContainer.scrollTop + actionsContainer.clientHeight >= actionsContainer.scrollHeight - 50;
+                
+                actionsContainer.innerHTML = data.actions.map(parseActionEntry).join('');
+                
+                if (shouldScrollActions) {
+                    actionsContainer.scrollTop = actionsContainer.scrollHeight;
+                }
+                
+                previousActionsCount = data.actions.length;
+                
+            } catch (error) {
+                console.error('Error fetching monitor data:', error);
+            }
+        }
+        
+        // Initial fetch
+        fetchData();
+        
+        // Auto-refresh every 3 seconds
+        setInterval(fetchData, 3000);
+    </script>
+</body>
+</html>
