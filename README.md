@@ -17,7 +17,7 @@ See [README_UNIFIED.md](README_UNIFIED.md) for complete documentation.
 start_client.bat              # Windows
 ```
 
-**Then open:** http://localhost:5000
+**Then open:** http://localhost (port 80 via nginx proxy)
 
 ### Start SERVER Mode
 ```bash
@@ -141,7 +141,7 @@ Lightweight, downloadable client for end users that authenticates via the server
 - No local cryptography setup
 - All authentication delegated to server
 - Same mapping and pathfinding features
-- Runs on port 5000
+- Serves via nginx on port 80 (proxied to :5000 internally)
 
 [See Client Documentation](./client/README.md)
 
@@ -164,10 +164,10 @@ cd client
 python -m venv venv
 source venv/bin/activate  # or: venv\Scripts\activate.bat on Windows
 pip install -r requirements.txt
-python app.py  # Client runs on port 5000
+python app.py  # Client listens on :5000, exposed via nginx on :80
 ```
 
-Then open `http://localhost:5000` in your browser.
+Then open http://localhost in your browser (port 80).
 
 ### Production Deployment (with Nginx)
 

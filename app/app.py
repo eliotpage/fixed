@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Unified POPMAP Application
 Runs in either CLIENT or SERVER mode based on APP_MODE environment variable or --server flag.
@@ -68,6 +67,35 @@ MERGE_INTERVAL = 10
 app = Flask(__name__)
 load_dotenv()
 
+# Ensure logs directory exists for action logging in all modes
+os.makedirs('logs', exist_ok=True)
+
+
+# Action logging helper (available in both modes)
+def log_action(action, result, details="", user_override=None):
+    # Prefer forwarded IP when behind proxy
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    ip_part = forwarded_for.split(',')[0].strip() if forwarded_for else None
+    ip_addr = ip_part or request.remote_addr
+
+    user_val = user_override or request.headers.get('X-User') or session.get('user') or session.get('email') or 'anonymous'
+
+    log_entry = (
+        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} | "
+        f"ip={ip_addr} "
+        f"method={request.method} "
+        f"path={request.path} "
+        f"user={user_val} "
+        f"action={action} "
+        f"result={result} "
+        f"details={details}"
+    )
+    try:
+        with open('logs/actions.log', 'a') as f:
+            f.write(log_entry + '\n')
+    except Exception as e:
+        print(f"Error logging action: {e}")
+
 # Server mode specific initialization
 if APP_MODE == "server":
     try:
@@ -117,20 +145,34 @@ if APP_MODE == "server":
     # Traffic logging middleware
     @app.before_request
     def log_request():
+        # Skip monitoring its own dashboard traffic
+        if request.path.startswith('/monitor'):
+            return
         request.start_time = time.time()
 
     @app.after_request
     def log_response(response):
+        if request.path.startswith('/monitor'):
+            return response
+
         if hasattr(request, 'start_time'):
             duration_ms = (time.time() - request.start_time) * 1000
+            qs = request.query_string.decode('utf-8') if request.query_string else '-'
+            ref = (request.referrer or '-').replace(' ', '')
+            ua = request.user_agent.string.replace('"', '')[:120]
+            body_bytes = request.content_length or (response.calculate_content_length() or 0)
+
             log_entry = (
                 f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} | "
                 f"ip={request.remote_addr} "
                 f"method={request.method} "
                 f"path={request.path} "
+                f"qs=\"{qs or '-'}\" "
                 f"status={response.status_code} "
                 f"duration_ms={duration_ms:.2f} "
-                f"user_agent={request.user_agent.string[:100]}"
+                f"bytes={body_bytes} "
+                f"ref=\"{ref}\" "
+                f"ua=\"{ua}\""
             )
             try:
                 with open('logs/traffic.log', 'a') as f:
@@ -139,23 +181,7 @@ if APP_MODE == "server":
                 print(f"Error logging traffic: {e}")
         return response
 
-    # Action logging helper
-    def log_action(action, result, details=""):
-        log_entry = (
-            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} | "
-            f"ip={request.remote_addr} "
-            f"method={request.method} "
-            f"path={request.path} "
-            f"user={session.get('email', 'anonymous')} "
-            f"action={action} "
-            f"result={result} "
-            f"details={details}"
-        )
-        try:
-            with open('logs/actions.log', 'a') as f:
-                f.write(log_entry + '\n')
-        except Exception as e:
-            print(f"Error logging action: {e}")
+    # Action logging handled globally; see action_log route outside server guard
 
     # Background thread to merge drawings with shared data every 10 seconds
     def merge_drawings_loop():
@@ -373,6 +399,63 @@ def verify_otp_endpoint():
 # DRAWING & MAP ROUTES
 # ============================================================
 
+@app.route('/action/log', methods=['POST'])
+def action_log():
+    """Capture user draw/delete actions; in client mode, forward to server if configured."""
+    payload = request.get_json(force=True, silent=True) or {}
+
+    action = payload.get('action', 'unknown')
+    result = payload.get('result', 'ok')
+    feature_id = payload.get('feature_id')
+    geometry = payload.get('geometry')
+    color = payload.get('color')
+    hostile = payload.get('hostile')
+    deleted = payload.get('deleted')
+
+    parts = []
+    if feature_id is not None:
+        parts.append(f"id={feature_id}")
+    if geometry:
+        parts.append(f"type={geometry}")
+    if color:
+        parts.append(f"color={color}")
+    if hostile is not None:
+        parts.append(f"hostile={hostile}")
+    if deleted is not None:
+        parts.append(f"deleted={deleted}")
+
+    detail_str = f"event={action} " + " ".join(parts)
+    user_override = payload.get('user')
+
+    # If running in client mode with a SERVER_URL, forward to server for central logging
+    if APP_MODE == "client":
+        try:
+            target = f"{SERVER_URL.rstrip('/')}/action/log"
+            resp = requests.post(
+                target,
+                json=payload,
+                headers={
+                    "X-Forwarded-For": request.remote_addr,
+                    "X-User": user_override or ''
+                },
+                timeout=2
+            )
+            if resp.ok:
+                return jsonify(success=True, forwarded=True)
+            else:
+                # Fall back to local log if server rejects
+                log_action('action_log_forward', 'error', f"status={resp.status_code}")
+        except Exception as e:
+            log_action('action_log_forward', 'error', f"message={str(e)[:80]}")
+
+    # Local logging (server mode or client fallback)
+    try:
+        log_action(action, result, details=detail_str.strip(), user_override=user_override)
+        return jsonify(success=True)
+    except Exception as e:
+        log_action('action_log', 'error', f"message={str(e)[:80]}")
+        return jsonify(error=str(e)), 400
+
 # Save user's drawings to local JSON database
 @app.route('/save_drawings', methods=['POST'])
 def save_drawings():
@@ -383,9 +466,17 @@ def save_drawings():
             data = json.loads(request.data.decode('utf-8'))
         
         os.makedirs(os.path.dirname(DRAWINGS_FILE), exist_ok=True)
+        deleted_count = sum(1 for f in data if f.get('properties', {}).get('deleted'))
         with open(DRAWINGS_FILE, 'w') as f:
             json.dump(data, f, indent=2)
         print(f"[Save] Saved {len(data)} drawings")
+
+        if APP_MODE == "server":
+            try:
+                log_action('save_drawings', 'ok', f"total={len(data)} deleted={deleted_count}")
+            except Exception as e:
+                print(f"[Action Log Error] {e}")
+
         return jsonify(success=True)
     except Exception as e:
         print(f"[Save Error] {e}")
@@ -599,7 +690,7 @@ if APP_MODE == "server":
                     lines = f.readlines()
                     total_traffic = len(lines)
                     recent_lines = lines[-100:]
-                    traffic_entries = [line.strip() for line in recent_lines if line.strip()]
+                    traffic_entries = [line.strip() for line in reversed(recent_lines) if line.strip()]
                     
                     # Count active sessions from last 5 minutes
                     for line in lines:
@@ -620,7 +711,7 @@ if APP_MODE == "server":
                     lines = f.readlines()
                     total_actions = len(lines)
                     recent_lines = lines[-50:]
-                    actions_entries = [line.strip() for line in recent_lines if line.strip()]
+                    actions_entries = [line.strip() for line in reversed(recent_lines) if line.strip()]
             
             return jsonify({
                 'traffic': traffic_entries,
@@ -629,6 +720,26 @@ if APP_MODE == "server":
                 'total_actions': total_actions,
                 'active_sessions': len(active_ips)
             })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/monitor/clear', methods=['POST'])
+    def monitor_clear():
+        """Truncate traffic/actions logs so clearing the dashboard is persistent."""
+        try:
+            log_type = request.args.get('type', 'all')
+            traffic_log = os.path.join('logs', 'traffic.log')
+            actions_log = os.path.join('logs', 'actions.log')
+
+            cleared = []
+            if log_type in ('all', 'traffic'):
+                open(traffic_log, 'w').close()
+                cleared.append('traffic')
+            if log_type in ('all', 'actions'):
+                open(actions_log, 'w').close()
+                cleared.append('actions')
+
+            return jsonify(success=True, cleared=cleared)
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
@@ -659,4 +770,4 @@ if __name__ == "__main__":
         port = 5000
         print(f"Starting POPMAP CLIENT on port {port}")
 
-    app.run(debug=True, port=port, host='0.0.0.0')
+    app.run(debug=False, port=port, host='0.0.0.0')

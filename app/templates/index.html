@@ -508,6 +508,29 @@
                 .catch(err => console.error("Error saving drawings:", err));
             }
 
+            function reportAction(action, feature) {
+                try {
+                    const payload = {
+                        action,
+                        result: 'ok',
+                        feature_id: feature && feature.properties ? feature.properties._id : undefined,
+                        geometry: feature && feature.geometry ? feature.geometry.type : undefined,
+                        color: feature && feature.properties ? feature.properties.color : undefined,
+                        hostile: feature && feature.properties ? feature.properties.hostile : undefined,
+                        deleted: feature && feature.properties ? !!feature.properties.deleted : false
+                    };
+
+                    fetch('/action/log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        keepalive: true
+                    }).catch(() => {});
+                } catch (err) {
+                    console.warn('Failed to report action', err);
+                }
+            }
+
             function safeLoadDrawings() {
                 console.log('Loading drawings from server...');
                 fetch('/merge_drawings')
@@ -585,6 +608,7 @@
 
 
                 saveDrawings();
+                reportAction('draw', feature);
                 console.log('Created and saved:', feature.properties._id);
             });
 
@@ -594,6 +618,7 @@
                     const f = drawings.find(f => f.properties._id === l._leaflet_id);
                     if (f) {
                         f.properties.deleted = true;
+                        reportAction('delete', f);
                         console.log('Deleted layer:', l._leaflet_id);
                     }
                 });

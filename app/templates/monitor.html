@@ -176,6 +176,78 @@
             border-left-color: #e74c3c;
         }
 
+        .action-body {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+
+        .action-meta {
+            color: #555;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .action-raw {
+            color: #777;
+            font-size: 11px;
+            margin-top: 3px;
+            word-break: break-all;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .badge-draw {
+            background: rgba(39, 174, 96, 0.15);
+            color: #27ae60;
+        }
+
+        .badge-delete {
+            background: rgba(231, 76, 60, 0.15);
+            color: #e74c3c;
+        }
+
+        .badge-hostile {
+            background: rgba(142, 68, 173, 0.15);
+            color: #8e44ad;
+        }
+
+        .badge-error {
+            background: rgba(231, 76, 60, 0.15);
+            color: #e74c3c;
+        }
+
+        .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            display: inline-block;
+        }
+
+        .action-verb {
+            color: #2c3e50;
+        }
+
+        .action-feature {
+            color: #111;
+        }
+
+        .action-error {
+            border-left-color: #e74c3c;
+        }
+
         .action-entry .timestamp {
             display: block;
             margin-bottom: 4px;
@@ -254,12 +326,22 @@
             btn.textContent = isPaused ? 'Resume' : 'Pause';
         }
         
-        function clearTraffic() {
+        async function clearTraffic() {
             document.getElementById('traffic-log').innerHTML = '';
+            try {
+                await fetch('/monitor/clear?type=traffic', { method: 'POST' });
+            } catch (e) {
+                console.warn('Failed to clear traffic log on server', e);
+            }
         }
         
-        function clearActions() {
+        async function clearActions() {
             document.getElementById('actions-log').innerHTML = '';
+            try {
+                await fetch('/monitor/clear?type=actions', { method: 'POST' });
+            } catch (e) {
+                console.warn('Failed to clear actions log on server', e);
+            }
         }
         
         function parseTrafficEntry(entry) {
@@ -269,13 +351,17 @@
             const timestamp = parts[0].trim();
             const details = parts[1].trim();
             
-            let html = `<span class="timestamp">${timestamp}</span> | `;
+            let html = `<div class="traffic-top"><span class="timestamp">${timestamp}</span> | `;
             
             const ipMatch = details.match(/ip=([\d\.]+)/);
             const methodMatch = details.match(/method=(\w+)/);
             const pathMatch = details.match(/path=([^\s]+)/);
+            const qsMatch = details.match(/qs="([^"]*)"/);
             const statusMatch = details.match(/status=(\d+)/);
             const durationMatch = details.match(/duration_ms=([\d\.]+)/);
+            const bytesMatch = details.match(/bytes=(\d+)/);
+            const refMatch = details.match(/ref="([^"]*)"/);
+            const uaMatch = details.match(/ua="([^"]*)"/);
             
             if (ipMatch) {
                 html += `<span class="ip">${ipMatch[1]}</span> `;
@@ -300,6 +386,18 @@
                 html += `<span style="color: #999">${durationMatch[1]}ms</span>`;
             }
             
+            html += '</div>';
+            
+            const meta = [];
+            if (qsMatch && qsMatch[1] && qsMatch[1] !== '-') meta.push(`?${qsMatch[1]}`);
+            if (bytesMatch) meta.push(`${bytesMatch[1]} bytes`);
+            if (refMatch && refMatch[1] && refMatch[1] !== '-') meta.push(`ref ${refMatch[1]}`);
+            if (uaMatch && uaMatch[1] && uaMatch[1] !== '-') meta.push(`ua ${uaMatch[1]}`);
+
+            if (meta.length) {
+                html += `<div class="action-meta">${meta.join(' • ')}</div>`;
+            }
+            
             return html;
         }
         
@@ -308,15 +406,55 @@
             if (parts.length < 2) return entry;
             
             const timestamp = parts[0].trim();
-            const details = parts[1].trim();
+            const details = parts.slice(1).join('|').trim();
             
-            const resultMatch = details.match(/result=(\w+)/);
+            const resultMatch = details.match(/result=([\w-]+)/);
+            const ipMatch = details.match(/ip=([\d\.]+)/);
+            const userMatch = details.match(/user=([^\s]+)/);
+            const eventMatch = details.match(/event=([^\s]+)/);
+            const actionMatch = details.match(/action=([^\s]+)/);
+            const featureMatch = details.match(/id=([^\s]+)/);
+            const typeMatch = details.match(/type=([^\s]+)/);
+            const colorMatch = details.match(/color=([^\s]+)/);
+            const hostileMatch = details.match(/hostile=([^\s]+)/);
+            const deletedMatch = details.match(/deleted=([^\s]+)/);
+            const methodMatch = details.match(/method=([^\s]+)/);
+            const pathMatch = details.match(/path=([^\s]+)/);
+
             const actionClass = resultMatch && resultMatch[1] === 'ok' ? 'action-ok' : 'action-error';
-            
+            const verb = (eventMatch && eventMatch[1] === 'delete') || (deletedMatch && deletedMatch[1] === 'True') ? 'deleted' : 'drew';
+            const featureText = `${typeMatch ? typeMatch[1] : 'feature'}${featureMatch ? ' #' + featureMatch[1] : ''}`;
+            const meta = [];
+            if (methodMatch && pathMatch) meta.push(`${methodMatch[1]} ${pathMatch[1]}`);
+            if (userMatch) meta.push(`user ${userMatch[1]}`);
+
+            const badge = verb === 'deleted'
+                ? '<span class="badge badge-delete">delete</span>'
+                : '<span class="badge badge-draw">draw</span>';
+            const hostileBadge = hostileMatch && (hostileMatch[1] === 'True' || hostileMatch[1] === 'true')
+                ? '<span class="badge badge-hostile">hostile</span>'
+                : '';
+            const colorDot = colorMatch ? `<span class="color-dot" style="background:${colorMatch[1]}"></span>` : '';
+            const statusBadge = resultMatch && resultMatch[1] !== 'ok'
+                ? `<span class="badge badge-error">${resultMatch[1]}</span>`
+                : '';
+
             return `
                 <div class="action-entry ${actionClass}">
-                    <div class="timestamp">${timestamp}</div>
-                    <div>${details}</div>
+                    <div class="action-top">
+                        <span class="timestamp">${timestamp}</span>
+                        ${ipMatch ? `<span class="ip">${ipMatch[1]}</span>` : ''}
+                        ${statusBadge}
+                    </div>
+                    <div class="action-body">
+                        ${badge}
+                        ${colorDot}
+                        <span class="action-verb">${verb}</span>
+                        <span class="action-feature">${featureText}</span>
+                        ${hostileBadge}
+                    </div>
+                    ${meta.length ? `<div class="action-meta">${meta.join(' • ')}</div>` : ''}
+                    <div class="action-raw">${details}</div>
                 </div>
             `;
         }
