@@ -24,4 +24,11 @@ fi
 
 # Run in client mode
 export APP_MODE=client
+
+# Optional: paste a server-issued Connection ID to auto-configure SERVER_URL
+read -r -p "Enter Connection ID (leave blank to use SERVER_URL/default): " SERVER_ID_INPUT
+if [ -n "$SERVER_ID_INPUT" ]; then
+    export SERVER_ID="$SERVER_ID_INPUT"
+fi
+
 python3 app.py

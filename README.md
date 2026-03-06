@@ -17,6 +17,8 @@ See [README_UNIFIED.md](README_UNIFIED.md) for complete documentation.
 start_client.bat              # Windows
 ```
 
+When prompted, paste the **Connection ID** printed by the server startup.
+
 **Then open:** http://localhost (port 80 via nginx proxy)
 
 ### Start SERVER Mode
@@ -24,6 +26,20 @@ start_client.bat              # Windows
 ./start_server.sh              # Linux/macOS
 # or  
 start_server.bat              # Windows
+```
+
+On startup, the server prints:
+- `Connection URL` (for direct debugging)
+- `Connection ID` (share this with clients)
+
+For cross-device/LAN use, set this before starting server:
+```bash
+PUBLIC_SERVER_URL=http://<server-lan-ip>:5001
+```
+
+Optional hardening (must match on server and clients):
+```bash
+POPMAP_CONNECTION_SECRET=shared-connection-secret
 ```
 
 **Then open:** http://localhost:5001 (or /monitor for dashboard)
@@ -59,6 +75,8 @@ start_server.bat              # Windows
    SECRET_KEY=your-secret-key-here
    SERVER_URL=http://localhost:5001
    ```
+
+    `SERVER_URL` is now optional when you use server-issued Connection IDs.
 
 5. **Run the application:**
    ```bash

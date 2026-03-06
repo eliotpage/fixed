@@ -90,3 +90,64 @@ def verify_otp(secret, user, token):
         return False
     del DB[user]
     return True
+
+
+CONNECTION_ID_SECRET_DEFAULT = "popmap-connection-id-v1"
+
+
+def _to_hex_ascii(text):
+    return text.encode("utf-8").hex()
+
+
+def _from_hex_ascii(hex_text):
+    return bytes.fromhex(hex_text).decode("utf-8")
+
+
+def generate_connection_id(server_url, secret=None, ttl_seconds=604800):
+    """
+    Build a signed connection ID that can be shared with clients.
+    Encodes server URL + expiry and signs it using the local SHA-256 helper.
+    """
+    if not server_url:
+        raise ValueError("server_url is required")
+
+    rng = RNG(int(time.time() * 1000000))
+    nonce = rng.token(12)
+    exp = int(time.time()) + int(ttl_seconds)
+
+    body = f"{server_url}|{exp}|{nonce}"
+    signing_secret = secret or CONNECTION_ID_SECRET_DEFAULT
+    sig = sha256(signing_secret + body)[:16]
+    payload = f"v1|{body}|{sig}"
+    return _to_hex_ascii(payload)
+
+
+def resolve_connection_id(connection_id, secret=None):
+    """
+    Resolve a connection ID into a server URL.
+    Raises ValueError if malformed, expired, or signature check fails.
+    """
+    if not connection_id:
+        raise ValueError("connection_id is required")
+
+    signing_secret = secret or CONNECTION_ID_SECRET_DEFAULT
+    try:
+        payload = _from_hex_ascii(connection_id.strip())
+        parts = payload.split("|")
+        if len(parts) != 5 or parts[0] != "v1":
+            raise ValueError("Invalid connection ID format")
+
+        _, server_url, exp_str, nonce, sig = parts
+        body = f"{server_url}|{exp_str}|{nonce}"
+        expected_sig = sha256(signing_secret + body)[:16]
+        if sig != expected_sig:
+            raise ValueError("Invalid connection ID signature")
+
+        if int(time.time()) > int(exp_str):
+            raise ValueError("Connection ID has expired")
+
+        return server_url
+    except ValueError:
+        raise
+    except Exception:
+        raise ValueError("Invalid connection ID")

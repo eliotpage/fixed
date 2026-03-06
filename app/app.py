@@ -22,9 +22,11 @@ import time
 import re
 import sys
 import argparse
+import socket
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from lib.dstar import DStarLite
+from lib.hashing import generate_otp, verify_otp, generate_connection_id, resolve_connection_id
 from dotenv import load_dotenv
 import numpy as np
 import requests
@@ -100,7 +102,6 @@ def log_action(action, result, details="", user_override=None):
 if APP_MODE == "server":
     try:
         from flask_mail import Mail, Message
-        from lib.hashing import generate_otp, verify_otp
         
         app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
         MAIL_USERNAME = os.getenv("MAIL_USERNAME")
@@ -131,6 +132,31 @@ else:
     mail = None
 
 SERVER_URL = os.getenv("SERVER_URL", "http://localhost")
+CONNECTION_ID_SECRET = os.getenv("POPMAP_CONNECTION_SECRET", "")
+
+if APP_MODE == "client":
+    server_id = os.getenv("SERVER_ID", "").strip()
+    if server_id:
+        try:
+            # Client prefers SERVER_ID when provided because it carries a signed URL.
+            SERVER_URL = resolve_connection_id(server_id, CONNECTION_ID_SECRET or None)
+            print(f"[Client] Resolved server from SERVER_ID: {SERVER_URL}")
+        except ValueError as e:
+            print(f"[Client] Invalid SERVER_ID: {e}")
+            print("[Client] Startup aborted. Enter a valid Connection ID.")
+            sys.exit(1)
+
+
+def detect_local_ip():
+    """Best-effort local IP detection for connection ID generation."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))
+        return sock.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        sock.close()
 
 # Initialize pathfinding engine with terrain data
 dstar = DStarLite(DEM_PATH, tile_dir=TILE_DIR, zoom=11)
@@ -162,9 +188,14 @@ if APP_MODE == "server":
             ua = request.user_agent.string.replace('"', '')[:120]
             body_bytes = request.content_length or (response.calculate_content_length() or 0)
 
+            # Prefer forwarded IP when behind proxy (same logic as log_action)
+            forwarded_for = request.headers.get('X-Forwarded-For', '')
+            ip_part = forwarded_for.split(',')[0].strip() if forwarded_for else None
+            ip_addr = ip_part or request.remote_addr
+
             log_entry = (
                 f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} | "
-                f"ip={request.remote_addr} "
+                f"ip={ip_addr} "
                 f"method={request.method} "
                 f"path={request.path} "
                 f"qs=\"{qs or '-'}\" "
@@ -690,7 +721,7 @@ if APP_MODE == "server":
                     lines = f.readlines()
                     total_traffic = len(lines)
                     recent_lines = lines[-100:]
-                    traffic_entries = [line.strip() for line in reversed(recent_lines) if line.strip()]
+                    traffic_entries = [line.strip() for line in recent_lines if line.strip()]
                     
                     # Count active sessions from last 5 minutes
                     for line in lines:
@@ -711,7 +742,7 @@ if APP_MODE == "server":
                     lines = f.readlines()
                     total_actions = len(lines)
                     recent_lines = lines[-50:]
-                    actions_entries = [line.strip() for line in reversed(recent_lines) if line.strip()]
+                    actions_entries = [line.strip() for line in recent_lines if line.strip()]
             
             return jsonify({
                 'traffic': traffic_entries,
@@ -766,6 +797,18 @@ if __name__ == "__main__":
             merge_thread.start()
         port = 5001
         print(f"Starting POPMAP SERVER on port {port}")
+
+        public_server_url = os.getenv("PUBLIC_SERVER_URL", "").strip()
+        if not public_server_url:
+            public_server_url = f"http://{detect_local_ip()}:{port}"
+
+        try:
+            connection_id = generate_connection_id(public_server_url, CONNECTION_ID_SECRET or None)
+            print(f"[Server] Connection URL: {public_server_url}")
+            print(f"[Server] Connection ID: {connection_id}")
+            print("[Server] Share this ID with clients. It expires in 7 days by default.")
+        except Exception as e:
+            print(f"[Server] Failed to generate connection ID: {e}")
     else:
         port = 5000
         print(f"Starting POPMAP CLIENT on port {port}")
