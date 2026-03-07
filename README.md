@@ -27,10 +27,37 @@ Windows:
 start_server.bat
 ```
 
+Quick help:
+```bash
+./start_server.sh --help
+```
+
+Auth setup during server startup:
+1. Server setup now checks `app/.env` for auth variables.
+2. Missing `SECRET_KEY` and `POPMAP_CONNECTION_SECRET` are generated automatically.
+3. You are prompted for `MAIL_USERNAME` and `MAIL_PASSWORD` (optional, needed for OTP email).
+4. Values are saved to `app/.env` for future runs.
+
 Optional flags:
 ```bash
 ./start_server.sh --port 5001 --tile-dir /path/to/tiles --ngrok
 ```
+
+Force auth reconfiguration:
+```bash
+./start_server.sh --setup-auth
+```
+
+First-time remote setup (recommended):
+```bash
+./start_server.sh --setup-auth --ngrok
+```
+
+`--setup-auth` behavior:
+1. Forces server setup to re-prompt for auth variables
+2. Regenerates or rewrites `SECRET_KEY` and `POPMAP_CONNECTION_SECRET`
+3. Prompts again for `MAIL_USERNAME` and `MAIL_PASSWORD`
+4. Saves updated values into `app/.env`
 
 `--ngrok` behavior:
 1. `start_server.sh` and `start_server.bat` check whether `ngrok` exists
@@ -53,6 +80,11 @@ Linux/macOS:
 Windows:
 ```bat
 start_client.bat --uid <connection-id>
+```
+
+Quick help:
+```bash
+./start_client.sh --help
 ```
 
 Optional flags:

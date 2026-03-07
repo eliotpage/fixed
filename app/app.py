@@ -252,24 +252,37 @@ def detect_ngrok_tunnel(quiet=False):
     
     ngrok typically exposes its API on http://127.0.0.1:4040 by default.
     """
-    try:
-        import json
-        import urllib.request
-        
-        with urllib.request.urlopen('http://127.0.0.1:4040/api/tunnels', timeout=2) as res:
-            data = json.loads(res.read().decode())
-            tunnels = data.get('tunnels', [])
-            
-            for tunnel in tunnels:
-                if tunnel.get('proto') in ('http', 'https'):
-                    public_url = tunnel.get('public_url')
-                    if public_url:
-                        print(f"[Server] Detected ngrok tunnel: {public_url}")
-                        return public_url
-    except Exception as e:
-        if not quiet:
-            print(f"[Server] ngrok not detected on localhost:4040 (is it running? `ngrok http 5001`)")
-            print("[Server] Fallback to local IP detection.")
+    import json
+    import urllib.request
+
+    api_candidates = []
+    env_api = os.getenv("NGROK_API_URL", "").strip()
+    if env_api:
+        api_candidates.append(env_api)
+    api_candidates.extend([
+        'http://127.0.0.1:4040/api/tunnels',
+        'http://127.0.0.1:4041/api/tunnels',
+    ])
+
+    for api_url in api_candidates:
+        try:
+            with urllib.request.urlopen(api_url, timeout=2) as res:
+                data = json.loads(res.read().decode())
+                tunnels = data.get('tunnels', [])
+
+                for tunnel in tunnels:
+                    if tunnel.get('proto') in ('http', 'https'):
+                        public_url = tunnel.get('public_url')
+                        if public_url:
+                            print(f"[Server] Detected ngrok tunnel: {public_url}")
+                            return public_url
+        except Exception:
+            continue
+
+    if not quiet:
+        print("[Server] ngrok tunnel URL not detected from local API.")
+        print("[Server] If needed, set NGROK_API_URL or run `ngrok config add-authtoken <token>`.")
+        print("[Server] Fallback to local IP detection.")
     
     return None
 
@@ -290,7 +303,7 @@ def stop_ngrok_tunnel():
     NGROK_PROCESS = None
 
 
-def start_ngrok_tunnel(port, timeout_seconds=12):
+def start_ngrok_tunnel(port, timeout_seconds=20):
     """Start ngrok tunnel for the given port and return tunnel URL if available."""
     global NGROK_PROCESS
 
@@ -1081,4 +1094,4 @@ if __name__ == "__main__":
             port = 5000
         print(f"Starting POPMAP CLIENT on port {port}")
 
-    app.run(debug=True, port=port, host='0.0.0.0')
+    app.run(debug=False, use_reloader=False, port=port, host='0.0.0.0')
