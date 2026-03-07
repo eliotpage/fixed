@@ -32,6 +32,11 @@ Optional flags:
 ./start_server.sh --port 5001 --tile-dir /path/to/tiles --ngrok
 ```
 
+`--ngrok` behavior:
+1. `start_server.sh` and `start_server.bat` check whether `ngrok` exists
+2. If missing, setup attempts to install it automatically
+3. The server then starts and creates the tunnel
+
 What server prints:
 1. `Connection URL`
 2. `Connection ID` (UID)
@@ -83,6 +88,10 @@ If server is in Codespaces:
 2. Use printed Connection ID on any client
 
 If server is local PC and needs internet access:
-1. Install ngrok (`brew install ngrok` on macOS, or from ngrok.com)
-2. Start server with: `./start_server.sh --ngrok`
+1. Start server with: `./start_server.sh --ngrok`
+2. Setup auto-installs ngrok when missing (requires package manager/admin permissions)
 3. Share printed Connection ID
+
+If auto-install fails:
+1. Install ngrok manually from `https://ngrok.com/download`
+2. Rerun server with `--ngrok`
