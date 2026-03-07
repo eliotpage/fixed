@@ -27,6 +27,6 @@ export APP_MODE=client
 
 # Optional flags:
 #   --port <client-port>
-#   --tile-dir /path/to/tiles
 #   --uid <connection-id>  (alias: --server-id)
+#   --tile-dir /path/to/tiles   (optional local tile cache; otherwise tiles are proxied from server)
 python3 app.py "$@"

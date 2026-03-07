@@ -24,7 +24,7 @@ import sys
 import argparse
 import socket
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, Response
 from lib.dstar import DStarLite
 from lib.hashing import generate_otp, verify_otp, generate_connection_id, resolve_connection_id
 from dotenv import load_dotenv
@@ -382,14 +382,31 @@ def map_page():
 
 @app.route('/tiles/<int:z>/<int:x>/<int:y>.png')
 def tile_file(z, x, y):
-    """Serve map tiles from configurable TILE_DIR."""
-    if not TILE_DIR:
-        return jsonify(error="Tiles are not configured"), 404
-    tile_folder = os.path.join(TILE_DIR, str(z), str(x))
+    """Serve tiles locally when present, otherwise proxy from server in client mode."""
     tile_name = f"{y}.png"
-    if not os.path.exists(os.path.join(tile_folder, tile_name)):
-        return jsonify(error="Tile not found"), 404
-    return send_from_directory(tile_folder, tile_name)
+
+    if TILE_DIR:
+        tile_folder = os.path.join(TILE_DIR, str(z), str(x))
+        local_tile = os.path.join(tile_folder, tile_name)
+        if os.path.exists(local_tile):
+            return send_from_directory(tile_folder, tile_name)
+
+    if APP_MODE == "client":
+        target = f"{SERVER_URL.rstrip('/')}/tiles/{z}/{x}/{y}.png"
+        try:
+            upstream = requests.get(target, timeout=10)
+            if upstream.status_code == 200:
+                response = Response(upstream.content, mimetype=upstream.headers.get("Content-Type", "image/png"))
+                response.headers["Cache-Control"] = upstream.headers.get("Cache-Control", "public, max-age=3600")
+                return response
+            if upstream.status_code == 404:
+                return jsonify(error="Tile not found"), 404
+            return jsonify(error="Server tile fetch failed"), 502
+        except Exception as e:
+            print(f"[Tile Proxy Error] target={target} error={e}")
+            return jsonify(error="Could not fetch tile from server"), 502
+
+    return jsonify(error="Tiles are not configured"), 404
 
 # ============================================================
 # AUTHENTICATION ROUTES

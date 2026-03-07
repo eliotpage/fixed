@@ -24,6 +24,6 @@ REM Nginx startup from Linux script is not applied on Windows.
 set APP_MODE=client
 REM Optional flags:
 REM   --port <client-port>
-REM   --tile-dir C:\path\to\tiles
 REM   --uid <connection-id>  (alias: --server-id)
+REM   --tile-dir C:\path\to\tiles   (optional local tile cache; otherwise tiles are proxied from server)
 %PYTHON_CMD% app.py %*

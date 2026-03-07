@@ -31,6 +31,7 @@ pip install -q -r requirements.txt
 #   export POPMAP_CONNECTION_SECRET=shared-connection-secret
 # Optional to customize tile directory when using map-based routing:
 #   export TILE_DIR=/path/to/tiles
+#   (server tiles are also used by remote clients via /tiles proxy)
 # Optional startup flags:
 #   --port <server-port>
 #   --tile-dir /path/to/tiles

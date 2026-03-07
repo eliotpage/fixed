@@ -266,7 +266,6 @@
         <script src="static/leaflet/leaflet.js"></script>
         <script src="static/leaflet-draw/dist/leaflet.draw.js"></script>
         <script>
-
             function showAlert(msg, type='error', duration=5000) {
                 const alertDiv = document.getElementById('site-alert');
                 
@@ -302,6 +301,7 @@
                 minZoom: 11,
                 maxZoom: 16
             });
+
             L.tileLayer('/tiles/{z}/{x}/{y}.png', {
                 noWrap: true,
                 minZoom: 11,
