@@ -102,7 +102,7 @@ setup_auth_env_if_missing() {
     existing_mail_pass="$(get_env_value MAIL_PASSWORD)"
 
     if [ "$FORCE_AUTH_SETUP" -eq 1 ]; then
-        echo "[Setup] --setup-auth detected: forcing auth environment prompts."
+        echo "[Server Setup] --setup-auth detected: forcing auth environment prompts."
         existing_secret=""
         existing_conn_secret=""
         existing_mail_user=""
@@ -114,13 +114,19 @@ setup_auth_env_if_missing() {
     fi
 
     if [ ! -t 0 ]; then
-        echo "[Setup] Missing auth env values in app/.env, but no interactive terminal is available."
-        echo "[Setup] Add SECRET_KEY, POPMAP_CONNECTION_SECRET, MAIL_USERNAME, MAIL_PASSWORD to app/.env."
+        echo "[Server Setup] Missing auth env values in app/.env, but no interactive terminal is available."
+        echo "[Server Setup] Add SECRET_KEY, POPMAP_CONNECTION_SECRET, MAIL_USERNAME, MAIL_PASSWORD to app/.env."
         return 0
     fi
 
-    echo "[Setup] Auth environment setup"
-    echo "[Setup] Missing values will be written to app/.env"
+    echo ""
+    echo "============================================================"
+    echo "  POPMAP SERVER - Environment Setup"
+    echo "============================================================"
+    echo ""
+    echo "[Server Setup] Missing values will be generated/prompted and"
+    echo "[Server Setup] saved to app/.env"
+    echo ""
 
     if [ -z "$existing_secret" ]; then
         generated_secret="$(generate_secret)"
@@ -175,6 +181,10 @@ setup_auth_env_if_missing() {
             fi
         fi
     fi
+    
+    echo ""
+    echo "[Server Setup] Configuration saved to app/.env"
+    echo ""
 }
 
 ensure_ngrok() {
@@ -245,7 +255,31 @@ if [ "$WANTS_NGROK" -eq 1 ]; then
     ensure_ngrok || true
 fi
 
-setup_auth_env_if_missing
+# Check if .env exists or needs setup
+if [ ! -f "$ENV_FILE" ] || [ "$FORCE_AUTH_SETUP" -eq 1 ]; then
+    if [ ! -f "$ENV_FILE" ]; then
+        echo "[Server] No .env file found."
+        if [ -t 0 ]; then
+            echo "[Server] Would you like to set it up now? (Y/n)"
+            read -r setup_response
+            if [ "$setup_response" != "n" ] && [ "$setup_response" != "N" ]; then
+                FORCE_AUTH_SETUP=1
+            fi
+        fi
+    fi
+    
+    if [ "$FORCE_AUTH_SETUP" -eq 1 ]; then
+        setup_auth_env_if_missing
+    elif [ ! -f "$ENV_FILE" ]; then
+        echo "[Server] .env file is required. Options:"
+        echo "  1. Run: ./start_server.sh -s (to set up interactively)"
+        echo "  2. Copy app/.env.example to app/.env and edit it manually"
+        exit 1
+    fi
+else
+    setup_auth_env_if_missing
+fi
+
 setup_tiles_dir_if_missing
 
 if [ ! -d "venv" ]; then

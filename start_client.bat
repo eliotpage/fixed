@@ -11,6 +11,20 @@ set "PYTHON_CMD=py -3"
 where py >nul 2>&1
 if errorlevel 1 set "PYTHON_CMD=python"
 
+REM Check if .env exists
+if not exist ".env" (
+    echo [Client] No .env file found in app directory.
+    echo [Client] The client needs environment configuration to connect.
+    echo.
+    echo Options:
+    echo   1. Copy the .env file from your server to app\.env
+    echo   2. Use Linux/macOS: Run ./start_client.sh -s for interactive setup
+    echo   3. Copy app\.env.example to app\.env and edit manually
+    echo.
+    echo Press Ctrl+C to exit, or press any key to continue anyway...
+    pause >nul
+)
+
 set "LOGS_VALUE=0"
 set "LOOKING_FOR_LOGS_VALUE=0"
 set "LOOKING_FOR_UID_VALUE=0"

@@ -47,7 +47,17 @@ for %%A in (%*) do (
 set "ENV_FILE=.env"
 
 if not exist "%ENV_FILE%" (
+    echo [Server] No .env file found in app directory.
+    echo [Server] The server needs environment configuration.
+    echo.
+    echo Options:
+    echo   1. Use Linux/macOS: Run ./start_server.sh -s for interactive setup
+    echo   2. Copy app\.env.example to app\.env and edit manually
+    echo   3. Press any key to create an empty .env ^(you'll need to configure it^)
+    echo.
+    pause
     type nul > "%ENV_FILE%"
+)
 )
 
 set "SECRET_KEY_VALUE="
